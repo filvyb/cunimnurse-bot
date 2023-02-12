@@ -1,0 +1,17 @@
+[discord]
+token = "bot_token"
+guild_id = "id"
+
+[database]
+host = "localhost"
+port = "5432"
+user = "user"
+password = "password"
+dbname = "dbname"
+
+[email]
+address = "smtp.mail.tld"
+port = "465"
+ssl = true
+user = "user@mail.tld"
+password = "password"
