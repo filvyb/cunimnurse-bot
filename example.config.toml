@@ -1,6 +1,7 @@
 [discord]
 token = "bot_token"
 guild_id = "id"
+verify_channel = "id"
 
 [database]
 host = "localhost"

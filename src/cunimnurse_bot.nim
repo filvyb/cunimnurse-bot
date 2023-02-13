@@ -1,13 +1,15 @@
-import std/db_postgres
-import std/strformat
+import dimscord
 
-import config
+import asyncdispatch
+
 from db/init import initializeDB
+import bot_main
+import db/queries
 
 when is_main_module:
-  var conf = config.initConfig()
-  
-  let db_conn = open("", conf.database.user, conf.database.password, fmt"host={conf.database.host} port={conf.database.port} dbname={conf.database.dbname}")
-  initializeDB(db_conn)
+  if check_scheme() == "":
+    initializeDB()
 
-  echo "lol"
+  let discord = bot_main.discord
+
+  waitFor discord.startSession()

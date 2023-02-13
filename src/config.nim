@@ -1,11 +1,13 @@
 import parsetoml
 
 import std/os
+import std/smtp
 
 type
   DiscordConf* = object of RootObj
     token*: string
     guild_id*: string
+    verify_channel*: string
   DatabaseConf* = object of RootObj
     host*: string
     port*: string
@@ -14,7 +16,7 @@ type
     dbname*: string
   EmailConf* = object of RootObj
     address*: string
-    port*: string
+    port*: Port
     ssl*: bool
     user*: string
     password*: string
@@ -24,7 +26,7 @@ type
     email*: EmailConf
 
 
-proc initConfig*(): Config =
+proc initConfig(): Config =
   var config_path = ""
   if paramCount() == 0:
     config_path = "config.toml"
@@ -37,7 +39,11 @@ proc initConfig*(): Config =
   try:
     var x = parsetoml.parseFile(config_path)
     var d = x["discord"]
-    result.discord = DiscordConf(token: d["token"].getStr(), guild_id: d["guild_id"].getStr())
+    result.discord = DiscordConf()
+    result.discord.token = d["token"].getStr()
+    result.discord.guild_id = d["guild_id"].getStr()
+    result.discord.verify_channel = d["verify_channel"].getStr()
+
     var db = x["database"]
     result.database = DatabaseConf()
     result.database.host = db["host"].getStr()
@@ -45,13 +51,17 @@ proc initConfig*(): Config =
     result.database.user = db["user"].getStr()
     result.database.password = db["password"].getStr()
     result.database.dbname = db["dbname"].getStr()
+
     var e = x["email"]
     result.email = EmailConf()
     result.email.address = e["address"].getStr()
-    result.email.port = e["port"].getStr()
+    result.email.port = Port(uint16(e["port"].getInt()))
     result.email.ssl = e["ssl"].getBool()
     result.email.user = e["user"].getStr()
     result.email.password = e["password"].getStr()
+
   except CatchableError as e:
     stderr.writeLine(e.msg)
     quit(99)
+
+let conf* = initConfig()
