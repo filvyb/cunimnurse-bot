@@ -2,6 +2,7 @@
 token = "bot_token"
 guild_id = "id"
 verify_channel = "id"
+verified_role = "id"
 
 [database]
 host = "localhost"
@@ -12,7 +13,7 @@ dbname = "dbname"
 
 [email]
 address = "smtp.mail.tld"
-port = "465"
+port = 465
 ssl = true
 user = "user@mail.tld"
 password = "password"

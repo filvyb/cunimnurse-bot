@@ -13,3 +13,4 @@ when is_main_module:
   let discord = bot_main.discord
 
   waitFor discord.startSession()
+  

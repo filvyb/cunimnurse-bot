@@ -1,13 +1,13 @@
 import parsetoml
 
 import std/os
-import std/smtp
 
 type
   DiscordConf* = object of RootObj
     token*: string
     guild_id*: string
     verify_channel*: string
+    verified_role*: string
   DatabaseConf* = object of RootObj
     host*: string
     port*: string
@@ -16,7 +16,7 @@ type
     dbname*: string
   EmailConf* = object of RootObj
     address*: string
-    port*: Port
+    port*: uint16
     ssl*: bool
     user*: string
     password*: string
@@ -35,7 +35,7 @@ proc initConfig(): Config =
   else:
     stderr.writeLine("Wrong number of arguments", 1)
     quit(1)
-  #echo config_path
+
   try:
     var x = parsetoml.parseFile(config_path)
     var d = x["discord"]
@@ -43,6 +43,7 @@ proc initConfig(): Config =
     result.discord.token = d["token"].getStr()
     result.discord.guild_id = d["guild_id"].getStr()
     result.discord.verify_channel = d["verify_channel"].getStr()
+    result.discord.verified_role = d["verified_role"].getStr()
 
     var db = x["database"]
     result.database = DatabaseConf()
@@ -55,12 +56,13 @@ proc initConfig(): Config =
     var e = x["email"]
     result.email = EmailConf()
     result.email.address = e["address"].getStr()
-    result.email.port = Port(uint16(e["port"].getInt()))
+    result.email.port = uint16(e["port"].getInt())
     result.email.ssl = e["ssl"].getBool()
     result.email.user = e["user"].getStr()
     result.email.password = e["password"].getStr()
 
   except CatchableError as e:
+    stderr.writeLine("Can't load config")
     stderr.writeLine(e.msg)
     quit(99)
 
