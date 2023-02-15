@@ -10,6 +10,7 @@
                 "--debugger:native",
                 "--d:ssl",
                 "-d:dimscordDebug",
+                "--gcc.options.debug=\"-O0 -g3 -ggdb3\"",
                 "-o:${workspaceRoot}/bin/${fileBasenameNoExtension}",
                 "${relativeFile}"
             ],

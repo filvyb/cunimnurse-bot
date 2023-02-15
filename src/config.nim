@@ -8,6 +8,8 @@ type
     guild_id*: string
     verify_channel*: string
     verified_role*: string
+    moderator_role*: string
+    admin_role*: string
   DatabaseConf* = object of RootObj
     host*: string
     port*: string
@@ -44,6 +46,8 @@ proc initConfig(): Config =
     result.discord.guild_id = d["guild_id"].getStr()
     result.discord.verify_channel = d["verify_channel"].getStr()
     result.discord.verified_role = d["verified_role"].getStr()
+    result.discord.moderator_role = d["moderator_role"].getStr()
+    result.discord.admin_role = d["admin_role"].getStr()
 
     var db = x["database"]
     result.database = DatabaseConf()
