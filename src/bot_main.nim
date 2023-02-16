@@ -75,7 +75,7 @@ proc sync_roles() {.async.} =
 
     var db_roles_to_delete = db_roles_set - discord_roles_set
 
-    # first deletes roles tharen't in Discord but in DB
+    # first deletes roles that aren't in Discord but are in DB
     for r in db_roles_to_delete:
       info(fmt"Deleted role {r} from DB")
       discard query.delete_role(r)
@@ -93,12 +93,37 @@ proc sync_roles() {.async.} =
         info(fmt"Added role {role_id} {role_name} to DB")
         discard query.insert_role(role_id, role_name, power)
 
-  #var guild_members = await discord.api.getGuildMembers(conf.discord.guild_id)
-  #while guild_members.len mod 1000 == 0:
-  #  var after = guild_members[guild_members.len - 1].user.id
-  #  var tmp = await discord.api.getGuildMembers(conf.discord.guild_id, after=after)
-  #  for x in tmp:
-  #    guild_members.add(x)
+  # Syncing user roles
+  var guild_members = await discord.api.getGuildMembers(conf.discord.guild_id)
+  while guild_members.len mod 1000 == 0:
+    var after = guild_members[guild_members.len - 1].user.id
+    var tmp = await discord.api.getGuildMembers(conf.discord.guild_id, after=after)
+    for x in tmp:
+      guild_members.add(x)
+
+  for x in guild_members:
+    let user_id = x.user.id
+    let user_name = x.user.username
+    let user_disc_roles = x.roles
+    let tmpq = query.get_all_user_roles(user_id)
+    var user_db_roles: seq[string]
+
+    if tmpq.isSome:
+      user_db_roles = tmpq.get()
+
+    let user_disc_roles_set = toHashSet(user_disc_roles)
+    let user_db_roles_set = toHashSet(user_db_roles)
+    
+    let to_delete = user_db_roles_set - user_disc_roles_set
+    let to_add = user_disc_roles_set - user_db_roles_set
+
+    for r in to_delete:
+      info(fmt"Deleted role {r} from user {user_id} {user_name} from DB")
+      discard query.delete_role_relation(user_id, r)
+
+    for r in to_add:
+      info(fmt"Added role {r} to user {user_id} {user_name} to DB")
+      discard query.insert_role_relation(user_id, r)
 
   #echo guild_members.len
 
@@ -201,11 +226,34 @@ proc guildRoleUpdate(s: Shard, g: Guild, r: Role, o: Option[Role]) {.event(disco
   let role_id = r.id
   let role_name = r.name
   var role_name_old = ""#o.get().name
+
   if o.isSome:
     role_name_old = o.get().name
   if role_name != role_name_old:
     info(fmt"Renamed role {role_id} {role_name_old} to {role_name}")
     discard query.update_role_name(role_id, role_name)
+
+# Handle on fly role assignments
+proc guildMemberUpdate(s: Shard; g: Guild; m: Member; o: Option[Member]) {.event(discord).} =
+  let user_id = m.user.id
+  let user_name = m.user.username
+  let new_roles_set = toHashSet(m.roles)
+  var old_roles_set: HashSet[string]
+  var q = query.get_all_user_roles(user_id)
+
+  if q.isSome:
+    old_roles_set = toHashSet(q.get())
+
+  let to_delete = old_roles_set - new_roles_set
+  let to_add = new_roles_set - old_roles_set
+
+  for r in to_delete:
+    info(fmt"Deleted role {r} from user {user_id} {user_name} from DB")
+    discard query.delete_role_relation(user_id, r)
+
+  for r in to_add:
+    info(fmt"Added role {r} to user {user_id} {user_name} to DB")
+    discard query.insert_role_relation(user_id, r)
 
 # Command registration
 proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =

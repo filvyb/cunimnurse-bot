@@ -169,6 +169,21 @@ proc exists_role_relation*(user_id: string, role_id: string): bool =
     error(e.msg)
     return false
 
+proc get_all_user_roles*(user_id: string): Option[seq[string]] =
+  try:
+    var tmp = db.getAllRows(sql"SELECT role_id FROM role_ownership WHERE user_id = ?", user_id)
+    if tmp.len == 0:
+      return none(seq[string])
+    
+    var res: seq[string]
+    for x in tmp:
+      res.add(x[0])
+
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[string])
+
 proc delete_role_relation*(user_id: string, role_id: string): bool =
   try:
     db.exec(sql"DELETE FROM role_ownership WHERE user_id = ? AND role_id = ?",

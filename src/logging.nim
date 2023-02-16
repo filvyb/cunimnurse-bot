@@ -5,7 +5,7 @@ import config
 let conf = config.conf
 
 var consoleLog* = newConsoleLogger(fmtStr="[$datetime] - $levelname: ")
-var rollingLog* = newRollingFileLogger(conf.log.path, fmtStr="[$datetime] - $levelname: ")
+var fileLog* = newFileLogger(conf.log.path, fmtStr="[$datetime] - $levelname: ", levelThreshold=lvlAll, bufSize = 0)
 
 addHandler(consoleLog)
-addHandler(rollingLog)
+addHandler(fileLog)
