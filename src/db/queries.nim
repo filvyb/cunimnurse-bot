@@ -2,8 +2,10 @@ import std/db_postgres
 import std/strutils
 import std/options
 import std/sequtils
+import std/logging
 
 from init import db_conn
+import logging as clogger
 
 var db = db_conn
 
@@ -12,7 +14,7 @@ proc check_scheme*(): string =
   try:
     ret = db.getValue(sql"SELECT ? FROM scheme", "*")
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     ret = ""
   return ret
 
@@ -22,7 +24,7 @@ proc insert_user*(id: string, login: string, stat: int): bool =
         id, login, stat)
     return true
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return false
 
 proc insert_code*(login: string, code: string): bool =
@@ -31,7 +33,7 @@ proc insert_code*(login: string, code: string): bool =
         code, login)
     return true
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return false
 
 proc update_verified_status*(login: string, stat: int): bool =
@@ -40,7 +42,7 @@ proc update_verified_status*(login: string, stat: int): bool =
         stat, login)
     return true
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return false
 
 proc get_user_verification_status*(id: string): int =
@@ -50,7 +52,7 @@ proc get_user_verification_status*(id: string): int =
       return -1
     return parseInt(res)
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return -1
 
 proc get_user_verification_code*(id: string): string =
@@ -58,8 +60,17 @@ proc get_user_verification_code*(id: string): string =
     var res = db.getValue(sql"SELECT code FROM verification WHERE id = ?", id)
     return res
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return ""
+
+proc delete_user*(id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM verification WHERE id = ?",
+        id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
 
 proc insert_role*(id: string, name: string, power: int): bool =
   try:
@@ -67,7 +78,7 @@ proc insert_role*(id: string, name: string, power: int): bool =
         id, name, power)
     return true
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return false
 
 proc update_role_name*(id: string, name: string): bool =
@@ -76,7 +87,7 @@ proc update_role_name*(id: string, name: string): bool =
         name, id)
     return true
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return false
 
 proc update_role_power*(id: string, power: int): bool =
@@ -85,7 +96,7 @@ proc update_role_power*(id: string, power: int): bool =
         power, id)
     return true
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return false
 
 proc get_role*(id: string): Option[seq[string]] =
@@ -96,7 +107,7 @@ proc get_role*(id: string): Option[seq[string]] =
 
     return some(ret)
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return none(seq[string])
 
 proc get_role_bool*(id: string): bool =
@@ -106,7 +117,7 @@ proc get_role_bool*(id: string): bool =
       return false
     return true
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return false
 
 proc get_all_roles*(): Option[seq[Row]] =
@@ -116,7 +127,7 @@ proc get_all_roles*(): Option[seq[Row]] =
       return none(seq[Row])
     return some(res)
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
     return none(seq[Row])
 
 proc delete_role*(id: string): bool =
@@ -125,5 +136,44 @@ proc delete_role*(id: string): bool =
         id)
     return true
   except DbError as e:
-    stderr.writeLine(e.msg)
+    error(e.msg)
+    return false
+
+proc get_user_power_level*(id: string): int =
+  try:
+    var res = db.getValue(sql"SELECT r.power FROM roles r, role_ownership o WHERE o.user_id = ? GROUP BY r.power ORDER BY r.power DESC", id)
+    if res == "":
+      return -1
+    return parseInt(res)
+  except DbError as e:
+    error(e.msg)
+    return -1
+
+proc insert_role_relation*(user_id: string, role_id: string): bool =
+  try:
+    db.exec(sql"INSERT INTO role_ownership (user_id, role_id) VALUES (?, ?)",
+        user_id, role_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc exists_role_relation*(user_id: string, role_id: string): bool =
+  try:
+    var res = db.getValue(sql"SELECT * FROM role_ownership WHERE user_id = ? AND role_id = ?",
+        user_id, role_id)
+    if res == "":
+      return false
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc delete_role_relation*(user_id: string, role_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM role_ownership WHERE user_id = ? AND role_id = ?",
+        user_id, role_id)
+    return true
+  except DbError as e:
+    error(e.msg)
     return false

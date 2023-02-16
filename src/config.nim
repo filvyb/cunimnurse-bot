@@ -17,15 +17,19 @@ type
     password*: string
     dbname*: string
   EmailConf* = object of RootObj
+    verify_domain*: string
     address*: string
     port*: uint16
     ssl*: bool
     user*: string
     password*: string
+  LogConf* = object of RootObj
+    path*: string
   Config* = object of RootObj
     discord*: DiscordConf
     database*: DatabaseConf
     email*: EmailConf
+    log*: LogConf
 
 
 proc initConfig(): Config =
@@ -59,11 +63,16 @@ proc initConfig(): Config =
 
     var e = x["email"]
     result.email = EmailConf()
+    result.email.verify_domain = e["verify_domain"].getStr()
     result.email.address = e["address"].getStr()
     result.email.port = uint16(e["port"].getInt())
     result.email.ssl = e["ssl"].getBool()
     result.email.user = e["user"].getStr()
     result.email.password = e["password"].getStr()
+
+    var l = x["log"]
+    result.log = LogConf()
+    result.log.path = l["path"].getStr()
 
   except CatchableError as e:
     stderr.writeLine("Can't load config")

@@ -14,8 +14,12 @@ password = "password"
 dbname = "dbname"
 
 [email]
+verify_domain = "mail.tld"
 address = "smtp.mail.tld"
 port = 465
 ssl = true
 user = "user@mail.tld"
 password = "password"
+
+[log]
+path = "cunim.log"

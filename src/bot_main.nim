@@ -8,10 +8,12 @@ import times
 import std/random
 import std/sequtils
 import std/sets
+import std/logging
 
 import config
 import db/queries as query
 import commands/verify
+import logging as clogger
 
 let conf = config.conf
 
@@ -36,7 +38,7 @@ proc sync_roles() {.async.} =
   # populates empty db
   #echo "sync"
   if db_roles.isNone:
-    echo "empty db"
+    #echo "empty db"
     for r in discord_roles:
       var role_name = r.name
       var role_id = r.id
@@ -52,13 +54,12 @@ proc sync_roles() {.async.} =
       elif role_name == "@everyone":
         power = 0
       
-      echo fmt"Added role {role_id} {role_name} to DB"
-      discard insert_role(role_id, role_name, power)
+      info(fmt"Added role {role_id} {role_name} to DB")
+      discard query.insert_role(role_id, role_name, power)
 
   #db not empty
-  #echo db_roles
   if db_roles.isSome:
-    echo "not empty db"
+    #echo "not empty db"
     var discord_roles_seq: seq[string]
     var db_roles_seq: seq[string]
 
@@ -76,12 +77,12 @@ proc sync_roles() {.async.} =
 
     # first deletes roles tharen't in Discord but in DB
     for r in db_roles_to_delete:
-      echo fmt"Deleted role {r} from DB"
+      info(fmt"Deleted role {r} from DB")
       discard query.delete_role(r)
 
     #db_roles = query.get_all_roles()
 
-    # then deletes roles that are in Discord but not in DB
+    # then adds roles that are in Discord but not in DB
     for r in discord_roles:
       var role_name = r.name
       var role_id = r.id
@@ -89,8 +90,19 @@ proc sync_roles() {.async.} =
       var power = 1
 
       if not query.get_role_bool(role_id):
-        echo fmt"Added role {role_id} {role_name} to DB"
-        discard insert_role(role_id, role_name, power)
+        info(fmt"Added role {role_id} {role_name} to DB")
+        discard query.insert_role(role_id, role_name, power)
+
+  #var guild_members = await discord.api.getGuildMembers(conf.discord.guild_id)
+  #while guild_members.len mod 1000 == 0:
+  #  var after = guild_members[guild_members.len - 1].user.id
+  #  var tmp = await discord.api.getGuildMembers(conf.discord.guild_id, after=after)
+  #  for x in tmp:
+  #    guild_members.add(x)
+
+  #echo guild_members.len
+
+  info("DB synced")
 
 
 # User commands, done with slash
@@ -103,6 +115,22 @@ cmd.addSlash("verify", guildID = conf.discord.guild_id) do (login: string):
     else:
       await send_verification_mail(login)
       await i.reply(fmt"Email poslan")
+  else:
+    await i.reply(fmt"Spatny kanal")
+
+cmd.addSlash("resetverify", guildID = conf.discord.guild_id) do ():
+  ## Pouzi pokud si pokazil verify
+  let user_id = i.member.get().user.id
+  if i.channel_id.get() == conf.discord.verify_channel:
+    var user_stat = query.get_user_verification_status(user_id)
+    if user_stat == 1:
+      discard query.delete_user(user_id)
+      await i.reply(fmt"Pouzij znovu /verify")
+    elif user_stat > 1:
+      await i.reply(fmt"Neco se pokazilo. Kontaktuj adminy/moderatory")
+    else:
+      await i.reply(fmt"Pouzij /verify")
+      
   else:
     await i.reply(fmt"Spatny kanal")
 
@@ -124,31 +152,60 @@ cmd.addSlash("kasparek", guildID = conf.discord.guild_id) do ():
 
 # Admin and mod commands, done with $$
 cmd.addChat("forceverify") do (user: Option[User]):
-
-    if user.isSome():
-      var user_id = user.get().id
-      var ver_stat = query.get_user_verification_status(user_id)
-      if ver_stat == -1:
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  if user.isSome():
+    var user_id = user.get().id
+    var ver_stat = query.get_user_verification_status(user_id)
+    if ver_stat == -1:
+      randomize()
+      var q = query.insert_user(user_id, fmt"forced_{$rand(1..100000)}", 2)
+      while q == false:
         randomize()
-        var q = query.insert_user(user_id, fmt"forced_{$rand(1..100000)}", 2)
-        while q == false:
-          randomize()
-          q = query.insert_user(user_id, fmt"forced_{$rand(1..100000)}", 2)
-        await discord.api.addGuildMemberRole(conf.discord.guild_id, user_id, conf.discord.verified_role)
-        discard await msg.reply("Uzivatel byl overen")
-      elif ver_stat == 2:
-        discard await msg.reply("Uzivatel byl uz overen")
-      else:
-        discard query.update_verified_status(user_id, 2)
-        discard await msg.reply("Uzivatel byl overen")
-
+        q = query.insert_user(user_id, fmt"forced_{$rand(1..100000)}", 2)
+      await discord.api.addGuildMemberRole(conf.discord.guild_id, user_id, conf.discord.verified_role)
+      discard await msg.reply("Uzivatel byl overen")
+    elif ver_stat == 2:
+      discard await msg.reply("Uzivatel byl uz overen")
     else:
-        discard await discord.api.sendMessage(msg.channelID, "Uzivatel nenalezen")
+      discard query.update_verified_status(user_id, 2)
+      discard await msg.reply("Uzivatel byl overen")
+
+  else:
+    discard await msg.reply("Uzivatel nenalezen")
+
+cmd.addChat("change_role_power") do (id: string, power: int):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  var res = query.update_role_power(id, power)
+  discard await msg.reply($res)
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   await cmd.registerCommands()
   await sync_roles()
-  echo "Ready as " & $r.user
+  info("Ready as " & $r.user)
+
+proc guildRoleCreate(s: Shard, g: Guild, r: Role) {.event(discord).} =
+  let role_name = r.name
+  let role_id = r.id
+  info(fmt"Added role {role_id} {role_name} to DB")
+  discard query.insert_role(role_id, role_name, 1)
+
+proc guildRoleDelete(s: Shard, g: Guild, r: Role) {.event(discord).} =
+  let role_name = r.name
+  let role_id = r.id
+  info(fmt"Delete role {role_id} {role_name} from DB")
+  discard query.delete_role(role_id)
+
+proc guildRoleUpdate(s: Shard, g: Guild, r: Role, o: Option[Role]) {.event(discord).} =
+  let role_id = r.id
+  let role_name = r.name
+  var role_name_old = ""#o.get().name
+  if o.isSome:
+    role_name_old = o.get().name
+  if role_name != role_name_old:
+    info(fmt"Renamed role {role_id} {role_name_old} to {role_name}")
+    discard query.update_role_name(role_id, role_name)
 
 # Command registration
 proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =

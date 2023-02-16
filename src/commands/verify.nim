@@ -23,11 +23,11 @@ proc send_verification_mail*(login: string) {.async} =
 
   var msg = createMessage("Kod pro 1LF Discord",
                         fmt"Ahoj. Zde je tvuj overovaci kod: {code}. Napis mi ho do DM ve formatu: !overit <kod>  (bez zobacku)",
-                        @[fmt"{login}@cuni.cz"], @[""], headers)
+                        @[fmt"{login}@{conf.verify_domain}"], @[""], headers)
   let smtpConn = newAsyncSmtp(useSsl = conf.ssl)
   await smtpConn.connect(conf.address, Port conf.port)
   await smtpConn.auth(conf.user.split('@')[0], conf.password)
-  await smtpConn.sendmail(conf.user, @[fmt"{login}@cuni.cz"], $msg)
+  await smtpConn.sendmail(conf.user, @[fmt"{login}@{conf.verify_domain}"], $msg)
   await smtpConn.close()
 
 proc check_msg_for_verification_code*(msg: string, author_id: string): bool =
