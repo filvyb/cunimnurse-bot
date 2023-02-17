@@ -205,11 +205,34 @@ cmd.addChat("change_role_power") do (id: string, power: int):
   var res = query.update_role_power(id, power)
   discard await msg.reply($res)
 
+cmd.addChat("jail") do (user: Option[User]):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  if user.isSome():
+    let user_id = user.get().id
+    discard query.update_verified_status(user_id, 4)
+    var empty_role: seq[string]
+    await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some empty_role)
+  else:
+    discard await msg.reply("Uzivatel nenalezen")
+
+cmd.addChat("unjail") do (user: Option[User]):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  if user.isSome():
+    let user_id = user.get().id
+    discard query.update_verified_status(user_id, 2)
+    var roles = @[conf.discord.verified_role]
+    await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some roles)
+  else:
+    discard await msg.reply("Uzivatel nenalezen")
+
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   await cmd.registerCommands()
   await sync_roles()
   info("Ready as " & $r.user)
 
+# Handle on fly role changes
 proc guildRoleCreate(s: Shard, g: Guild, r: Role) {.event(discord).} =
   let role_name = r.name
   let role_id = r.id
@@ -232,6 +255,21 @@ proc guildRoleUpdate(s: Shard, g: Guild, r: Role, o: Option[Role]) {.event(disco
   if role_name != role_name_old:
     info(fmt"Renamed role {role_id} {role_name_old} to {role_name}")
     discard query.update_role_name(role_id, role_name)
+
+# Assign role on return
+proc guildMemberAdd(s: Shard, g: Guild, m: Member) {.event(discord).} =
+  let user_id = m.user.id
+
+  if query.get_user_verification_status(user_id) == 2:
+    var roles = @[conf.discord.verified_role]
+    await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some roles)
+
+proc guildMemberRemove(s: Shard, g: Guild, m: Member) {.event(discord).} =
+  let user_id = m.user.id
+  let user_name = m.user.username
+
+  info(fmt"Deleted roles from user {user_id} {user_name} from DB")
+  discard query.delete_all_user_role_relation(user_id)
 
 # Handle on fly role assignments
 proc guildMemberUpdate(s: Shard; g: Guild; m: Member; o: Option[Member]) {.event(discord).} =

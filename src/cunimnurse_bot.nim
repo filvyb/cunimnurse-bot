@@ -12,5 +12,5 @@ when is_main_module:
 
   let discord = bot_main.discord
 
-  waitFor discord.startSession(gateway_intents = {giGuilds, giGuildMessages, giDirectMessages, giGuildVoiceStates, giMessageContent, giGuildMembers, giGuildMessageReactions})
+  waitFor discord.startSession(gateway_intents = {giGuilds, giGuildMessages, giDirectMessages, giGuildVoiceStates, giMessageContent, giGuildMembers, giGuildMessageReactions, giMessageContent, giGuildBans, giGuildEmojisAndStickers})
   

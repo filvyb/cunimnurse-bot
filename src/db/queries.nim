@@ -36,10 +36,10 @@ proc insert_code*(login: string, code: string): bool =
     error(e.msg)
     return false
 
-proc update_verified_status*(login: string, stat: int): bool =
+proc update_verified_status*(id: string, stat: int): bool =
   try:
-    db.exec(sql"UPDATE verification SET status = ? WHERE login = ?",
-        stat, login)
+    db.exec(sql"UPDATE verification SET status = ? WHERE id = ?",
+        stat, id)
     return true
   except DbError as e:
     error(e.msg)
@@ -62,6 +62,21 @@ proc get_user_verification_code*(id: string): string =
   except DbError as e:
     error(e.msg)
     return ""
+
+proc get_verified_users*(): Option[seq[string]] =
+  try:
+    var tmp = db.getAllRows(sql"SELECT id FROM verification WHERE status = 2")
+    if tmp.len == 0:
+      return none(seq[string])
+    
+    var res: seq[string]
+    for x in tmp:
+      res.add(x[0])
+
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[string])
 
 proc delete_user*(id: string): bool =
   try:
@@ -188,6 +203,15 @@ proc delete_role_relation*(user_id: string, role_id: string): bool =
   try:
     db.exec(sql"DELETE FROM role_ownership WHERE user_id = ? AND role_id = ?",
         user_id, role_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc delete_all_user_role_relation*(user_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM role_ownership WHERE user_id = ?",
+        user_id)
     return true
   except DbError as e:
     error(e.msg)
