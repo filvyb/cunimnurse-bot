@@ -86,7 +86,6 @@ proc sync_roles() {.async.} =
     for r in discord_roles:
       var role_name = r.name
       var role_id = r.id
-      var role_manag = r.managed
       var power = 1
 
       if not query.get_role_bool(role_id):
@@ -169,13 +168,27 @@ cmd.addSlash("ping", guildID = conf.discord.guild_id) do ():
   discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
       content= some rep)
 
-
 cmd.addSlash("kasparek", guildID = conf.discord.guild_id) do ():
   ## Zepta se tvoji mami na tvoji velikost
   randomize()
   await i.reply(fmt"{$rand(1..48)}cm")
 
 # Admin and mod commands, done with $$
+cmd.addChat("help") do ():
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  let text = """
+            Pomoc pro adminy:
+            $$forceverify <uzivatel>
+            $$change_role_power <id role> <sila>
+            $$jail <uzivatel>
+            $$unjail <uzivatel>
+            $$add-role-reaction <emoji> <id role> <id zpravy> (nepodporuje custom emoji)
+
+            Prikazi nemaji moc kontrol tam dobre checkujte co pisete
+            """
+  discard await msg.reply(text)
+
 cmd.addChat("forceverify") do (user: Option[User]):
   if query.get_user_power_level(msg.author.id) <= 2:
     return
@@ -227,6 +240,18 @@ cmd.addChat("unjail") do (user: Option[User]):
   else:
     discard await msg.reply("Uzivatel nenalezen")
 
+cmd.addChat("add-role-reaction") do (emoji_name: string, role_id: string, message_id: string):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  if msg.channel_id in conf.discord.reaction_channels:
+    if insert_role_reaction(emoji_name, role_id, message_id):
+      await discord.api.addMessageReaction(msg.channel_id, message_id, emoji_name)
+      discard await msg.reply("Povoleno")
+    else:
+      discard await msg.reply("Nastala chyba")
+  else:
+    discard await msg.reply("Vyber roli reakcemi neni na tomto kanale povolen")
+
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   await cmd.registerCommands()
   await sync_roles()
@@ -264,12 +289,66 @@ proc guildMemberAdd(s: Shard, g: Guild, m: Member) {.event(discord).} =
     var roles = @[conf.discord.verified_role]
     await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some roles)
 
+# Remove roles on leaves
 proc guildMemberRemove(s: Shard, g: Guild, m: Member) {.event(discord).} =
   let user_id = m.user.id
   let user_name = m.user.username
 
   info(fmt"Deleted roles from user {user_id} {user_name} from DB")
   discard query.delete_all_user_role_relation(user_id)
+
+# Message reactions
+proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {.event(discord).} =
+  if u.bot: return
+
+  let room_id = m.channel_id
+  let user_id = u.id
+  let msg_id = m.id
+  let emoji_name = e.name.get()
+  #var member_roles = discord.api.getGuildMember(conf.discord.guild_id, user_id)
+  var member_roles: seq[string]
+  var q = query.get_all_user_roles(user_id)
+  if q.isSome:
+    member_roles = q.get()
+
+  # Assign role
+  if room_id in conf.discord.reaction_channels:
+    var role_to_give = query.get_reaction_role(emoji_name, msg_id)
+    if role_to_give != "":
+      await discord.api.addGuildMemberRole(conf.discord.guild_id, user_id, role_to_give)
+      #member_roles.add(role_to_give)
+
+      #discard await discord.api.sendMessage(m.channelId, fmt"name {emoji_name} role {role_to_give}")
+
+proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: bool) {.event(discord).} =
+  if u.bot: return
+
+  let room_id = m.channel_id
+  let user_id = u.id
+  let msg_id = m.id
+  let emoji_name = r.emoji.name.get()
+  var member_roles: seq[string]
+  var q = query.get_all_user_roles(user_id)
+  if q.isSome:
+    member_roles = q.get()
+
+  # Remove assigned role
+  if room_id in conf.discord.reaction_channels:
+    var role_to_del = query.get_reaction_role(emoji_name, msg_id)
+    var new_role_list = filter(member_roles, proc(x: string): bool = x != role_to_del)
+
+    await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some new_role_list)
+
+    #discard await discord.api.sendMessage(m.channelId, fmt"name {emoji_name} role {role_to_del}")
+
+proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
+  #if m.author.bot: return
+
+  let room_id = m.channel_id
+  let msg_id = m.id
+
+  if room_id in conf.discord.reaction_channels:
+    discard query.delete_reaction_message(msg_id)
 
 # Handle on fly role assignments
 proc guildMemberUpdate(s: Shard; g: Guild; m: Member; o: Option[Member]) {.event(discord).} =

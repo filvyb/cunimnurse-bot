@@ -7,6 +7,7 @@ type
     token*: string
     guild_id*: string
     verify_channel*: string
+    reaction_channels*: seq[string]
     verified_role*: string
     moderator_role*: string
     admin_role*: string
@@ -52,6 +53,11 @@ proc initConfig(): Config =
     result.discord.verified_role = d["verified_role"].getStr()
     result.discord.moderator_role = d["moderator_role"].getStr()
     result.discord.admin_role = d["admin_role"].getStr()
+    var tmp = d["reaction_channels"].getElems()
+    var tmpseq: seq[string]
+    for x in tmp:
+      tmpseq.add(x.getStr())
+    result.discord.reaction_channels = tmpseq
 
     var db = x["database"]
     result.database = DatabaseConf()
