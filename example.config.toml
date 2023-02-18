@@ -3,6 +3,7 @@ token = "bot_token"
 guild_id = "id"
 verify_channel = "id"
 reaction_channels = ["id", "id2"]
+thread_react_channels = ["id", "id2"]
 verified_role = "id"
 moderator_role = "id"
 admin_role = "id"

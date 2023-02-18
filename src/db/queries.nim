@@ -217,36 +217,71 @@ proc delete_all_user_role_relation*(user_id: string): bool =
     error(e.msg)
     return false
 
-proc insert_role_reaction*(emoji_name: string, role_id: string, message_id: string): bool =
+proc insert_role_reaction*(emoji_name: string, channel_id: string, role_id: string, message_id: string): bool =
   try:
-    db.exec(sql"INSERT INTO react2role (emoji_name, role_id, message_id) VALUES (?, ?, ?)",
-        emoji_name, role_id, message_id)
+    db.exec(sql"INSERT INTO react2role (emoji_name, channel_id, role_id, message_id) VALUES (?, ?, ?, ?)",
+        emoji_name, channel_id, role_id, message_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc get_reaction_role*(emoji_name: string, message_id: string): string =
+proc get_reaction_role*(emoji_name: string, channel_id: string, message_id: string): string =
   try:
-    var res = db.getValue(sql"SELECT role_id FROM react2role WHERE emoji_name = ? AND message_id = ?", emoji_name, message_id)
+    var res = db.getValue(sql"SELECT role_id FROM react2role WHERE emoji_name = ? AND channel_id = ? AND message_id = ?", emoji_name, channel_id, message_id)
     return res
   except DbError as e:
     error(e.msg)
     return ""
 
-proc delete_role_reaction*(emoji_name: string, role_id: string, message_id: string): bool =
+proc delete_role_reaction*(emoji_name: string, channel_id: string, role_id: string, message_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM react2role WHERE emoji_name = ? AND role_id = ? AND message_id = ?",
-        emoji_name, role_id, message_id)
+    db.exec(sql"DELETE FROM react2role WHERE emoji_name = ? AND channel_id = ? AND role_id = ? AND message_id = ?",
+        emoji_name, channel_id, role_id, message_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc delete_reaction_message*(message_id: string): bool =
+proc delete_reaction_message*(channel_id: string, message_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM react2role WHERE message_id = ?",
-        message_id)
+    db.exec(sql"DELETE FROM react2role WHERE channel_id = ? AND message_id = ?",
+        channel_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc insert_thread_reaction*(emoji_name: string, channel_id: string, thread_id: string, message_id: string): bool =
+  try:
+    db.exec(sql"INSERT INTO react2thread (emoji_name, channel_id, thread_id, message_id) VALUES (?, ?, ?, ?)",
+        emoji_name, channel_id, thread_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc get_reaction_thread*(emoji_name: string, channel_id: string, message_id: string): string =
+  try:
+    var res = db.getValue(sql"SELECT thread_id FROM react2thread WHERE emoji_name = ? AND channel_id = ? AND message_id = ?", emoji_name, channel_id, message_id)
+    return res
+  except DbError as e:
+    error(e.msg)
+    return ""
+
+proc delete_reaction2thread_message*(channel_id: string, message_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM react2thread WHERE channel_id = ? AND message_id = ?",
+        channel_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc delete_reaction_thread*(thread_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM react2thread WHERE thread_id = ?",
+        thread_id)
     return true
   except DbError as e:
     error(e.msg)

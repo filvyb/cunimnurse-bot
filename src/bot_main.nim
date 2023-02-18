@@ -9,6 +9,8 @@ import std/random
 import std/sequtils
 import std/sets
 import std/logging
+import std/math
+import std/os
 
 import config
 import db/queries as query
@@ -24,13 +26,24 @@ proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
 
 proc reply(i: Interaction, msg: string) {.async.} =
-    let response = InteractionResponse(
-        kind: irtChannelMessageWithSource,
-        data: some InteractionApplicationCommandCallbackData(
-            content: msg
-        )
-    )
-    await discord.api.createInteractionResponse(i.id, i.token, response)
+  let response = InteractionResponse(
+      kind: irtChannelMessageWithSource,
+      data: some InteractionApplicationCommandCallbackData(
+          content: msg
+      )
+  )
+  await discord.api.createInteractionResponse(i.id, i.token, response)
+
+proc set_reaction2thread(m: Message, emoji_name: string, thread_id: string, message_id: string) {.async.} =
+  let room_id = m.channel_id
+  if room_id in conf.discord.thread_react_channels:
+    if insert_thread_reaction(emoji_name, room_id, thread_id, message_id):
+      await discord.api.addMessageReaction(room_id, message_id, emoji_name)
+      #discard await m.reply("Povoleno")
+    else:
+      discard await m.reply("Nastala chyba")
+  #else:
+  #  discard await m.reply("Vyber roli reakcemi neni na tomto kanale povolen.")
 
 proc sync_roles() {.async.} =
   var discord_roles = await discord.api.getGuildRoles(conf.discord.guild_id)
@@ -184,6 +197,7 @@ cmd.addChat("help") do ():
             $$jail <uzivatel>
             $$unjail <uzivatel>
             $$add-role-reaction <emoji> <id role> <id zpravy> (nepodporuje custom emoji)
+            $$spawn-priv-threads <jmeno vlaken> <pocet>
 
             Prikazi nemaji moc kontrol tam dobre checkujte co pisete
             """
@@ -213,7 +227,7 @@ cmd.addChat("forceverify") do (user: Option[User]):
     discard await msg.reply("Uzivatel nenalezen")
 
 cmd.addChat("change_role_power") do (id: string, power: int):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   var res = query.update_role_power(id, power)
   discard await msg.reply($res)
@@ -243,14 +257,43 @@ cmd.addChat("unjail") do (user: Option[User]):
 cmd.addChat("add-role-reaction") do (emoji_name: string, role_id: string, message_id: string):
   if query.get_user_power_level(msg.author.id) <= 2:
     return
-  if msg.channel_id in conf.discord.reaction_channels:
-    if insert_role_reaction(emoji_name, role_id, message_id):
-      await discord.api.addMessageReaction(msg.channel_id, message_id, emoji_name)
+  let room_id = msg.channel_id
+  if room_id in conf.discord.reaction_channels:
+    if insert_role_reaction(emoji_name, room_id, role_id, message_id):
+      await discord.api.addMessageReaction(room_id, message_id, emoji_name)
       discard await msg.reply("Povoleno")
     else:
       discard await msg.reply("Nastala chyba")
   else:
-    discard await msg.reply("Vyber roli reakcemi neni na tomto kanale povolen")
+    discard await msg.reply("Vyber roli reakcemi neni na tomto kanale povolen.")
+
+cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  let room_id = msg.channel_id
+  var msg_count = ceilDiv(thread_number, 10)
+  var threads_done = 1
+
+  for i in 1..msg_count:
+    var msg_text = "Vyber is okruh\n"
+    #if msg_count != 1:
+    #  msg_text = "-\n"
+    let emojis = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
+
+    var react_msg = await discord.api.sendMessage(room_id, msg_text)
+    for p in 1..10:
+      var full_thread_name = thread_name & " " & $threads_done
+      msg_text = msg_text & full_thread_name & " - " & emojis[p - 1] & '\n'
+      sleep(250)
+      react_msg = await discord.api.editMessage(room_id, react_msg.id, msg_text)
+      var thread_obj = await discord.api.startThreadWithoutMessage(room_id, full_thread_name, 10080, some ctGuildPrivateThread, some false)
+      sleep(150)
+      await set_reaction2thread(msg, emojis[p - 1], thread_obj.id, react_msg.id)
+      if threads_done >= thread_number:
+        break
+      threads_done += 1
+      #echo p
+    
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   await cmd.registerCommands()
@@ -313,12 +356,16 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
 
   # Assign role
   if room_id in conf.discord.reaction_channels:
-    var role_to_give = query.get_reaction_role(emoji_name, msg_id)
+    var role_to_give = query.get_reaction_role(emoji_name, room_id, msg_id)
     if role_to_give != "":
       await discord.api.addGuildMemberRole(conf.discord.guild_id, user_id, role_to_give)
       #member_roles.add(role_to_give)
 
       #discard await discord.api.sendMessage(m.channelId, fmt"name {emoji_name} role {role_to_give}")
+  if room_id in conf.discord.thread_react_channels:
+    var thread_to_give = query.get_reaction_thread(emoji_name, room_id, msg_id)
+    if thread_to_give != "":
+      await discord.api.addThreadMember(thread_to_give, user_id)
 
 proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: bool) {.event(discord).} =
   if u.bot: return
@@ -334,13 +381,18 @@ proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: b
 
   # Remove assigned role
   if room_id in conf.discord.reaction_channels:
-    var role_to_del = query.get_reaction_role(emoji_name, msg_id)
+    var role_to_del = query.get_reaction_role(emoji_name, room_id, msg_id)
     var new_role_list = filter(member_roles, proc(x: string): bool = x != role_to_del)
 
     await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some new_role_list)
 
     #discard await discord.api.sendMessage(m.channelId, fmt"name {emoji_name} role {role_to_del}")
+  if room_id in conf.discord.thread_react_channels:
+    var thread_to_del = query.get_reaction_thread(emoji_name, room_id, msg_id)
+    if thread_to_del != "":
+      await discord.api.removeThreadMember(thread_to_del, user_id)
 
+# Remove react 2 roles/threads
 proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
   #if m.author.bot: return
 
@@ -348,7 +400,19 @@ proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
   let msg_id = m.id
 
   if room_id in conf.discord.reaction_channels:
-    discard query.delete_reaction_message(msg_id)
+    discard query.delete_reaction_message(room_id, msg_id)
+  if room_id in conf.discord.thread_react_channels:
+    discard query.delete_reaction2thread_message(room_id, msg_id)
+
+# Delete reaction to enter threads
+# threadDelete needs -d:nimOldCaseObjects to compile
+proc threadDelete(s: Shard, g: Guild, c: GuildChannel, exists: bool) {.event(discord).} =
+  let thread_id = c.id
+#  echo "td"
+#  
+  if c.kind == ctGuildPrivateThread:
+    info(fmt"Reactions to thread {thread_id} deleted from DB")
+    discard query.delete_reaction_thread(thread_id)
 
 # Handle on fly role assignments
 proc guildMemberUpdate(s: Shard; g: Guild; m: Member; o: Option[Member]) {.event(discord).} =

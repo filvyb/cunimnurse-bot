@@ -20,7 +20,8 @@ proc initializeDB*() =
                  id TEXT PRIMARY KEY,
                  login TEXT UNIQUE,
                  code VARCHAR(12),
-                 status INTEGER default 0 CHECK(status >= 0)
+                 status INTEGER default 0 CHECK(status >= 0),
+                 joined TIMESTAMPTZ default NOW()
                  )"""))
 
   #db_conn.exec(sql"CREATE INDEX log_tsv_idx ON verification USING gin(login_tsv)")
@@ -45,9 +46,18 @@ proc initializeDB*() =
 
   db_conn.exec(sql"DROP TABLE IF EXISTS react2role CASCADE")
   db_conn.exec(sql("""CREATE TABLE react2role (
-                 emoji_name TEXT,
+                 emoji_name TEXT NOT NULL,
+                 channel_id TEXT NOT NULL,
                  role_id TEXT references roles(id) ON DELETE CASCADE,
-                 message_id TEXT
+                 message_id TEXT NOT NULL
+                 )"""))
+
+  db_conn.exec(sql"DROP TABLE IF EXISTS react2thread CASCADE")
+  db_conn.exec(sql("""CREATE TABLE react2thread (
+                 emoji_name TEXT NOT NULL,
+                 channel_id TEXT NOT NULL,
+                 thread_id TEXT NOT NULL,
+                 message_id TEXT NOT NULL
                  )"""))
 
 
@@ -64,8 +74,16 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX rolown_id1 ON role_ownership (user_id)")
   db_conn.exec(sql"CREATE INDEX rolown_id2 ON role_ownership (role_id)")
 
-  db_conn.exec(sql"CREATE INDEX r2r_id ON react2role (role_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_id2 ON react2role (message_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_id_id2 ON react2role (role_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_name_id2 ON react2role (emoji_name, message_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_name_id_id2 ON react2role (emoji_name, role_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id ON react2role (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id2 ON react2role (role_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id3 ON react2role (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id2_id3 ON react2role (role_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_name_id_id3 ON react2role (emoji_name, channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_name_id_id2_id3 ON react2role (emoji_name, channel_id, role_id, message_id)")
+
+  db_conn.exec(sql"CREATE INDEX r2t_id ON react2thread (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id2 ON react2thread (thread_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id3 ON react2thread (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id2_id3 ON react2thread (thread_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id_id2_id3 ON react2thread (channel_id, thread_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_name_id_id2_id3 ON react2thread (emoji_name, channel_id, thread_id, message_id)")
