@@ -22,6 +22,22 @@ let conf = config.conf
 let discord* = newDiscordClient(conf.discord.token)
 var cmd = discord.newHandler()
 
+proc figure_channel_users(c: GuildChannel): seq[string] =
+  var channel_id = c.id
+  var over_perms = c.permission_overwrites
+  var res: seq[string]
+  for x, y in over_perms:
+    #echo y.repr
+    if y.kind == 1 and permViewChannel in y.allow:
+      #echo y
+      res.add(y.id)
+    if y.kind == 0:
+      let rol_users = query.get_all_role_users(y.id)
+      if rol_users.isSome:
+        for u in rol_users.get():
+          res.add(u)
+  return res
+
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
 
@@ -45,13 +61,71 @@ proc set_reaction2thread(m: Message, emoji_name: string, thread_id: string, mess
   #else:
   #  discard await m.reply("Vyber roli reakcemi neni na tomto kanale povolen.")
 
+proc sync_channels() {.async.} =
+  let discord_channels = await discord.api.getGuildChannels(conf.discord.guild_id)
+  let db_channels = query.get_all_channels()
+
+  if db_channels.isNone:
+    info("Channel DB empty")
+    for c in discord_channels:
+      if c.kind == ctGuildText or c.kind == ctGuildForum:
+        info(fmt"Added channel {c.id} {c.name} to DB")
+        discard query.insert_channel(c.id, c.name)
+
+  if db_channels.isSome:
+    info("Channel DB not empty")
+    var discord_channels_seq: seq[string]
+    var db_channels_seq: seq[string]
+    for c in discord_channels:
+      if c.kind == ctGuildText or c.kind == ctGuildForum:
+        discord_channels_seq.add(c.id)
+    for c in db_channels.get():
+      db_channels_seq.add(c[0])
+    var discord_channels_set = toHashSet(discord_channels_seq)
+    var db_channels_set = toHashSet(db_channels_seq)
+
+    let db_chan_to_del = db_channels_set - discord_channels_set
+    let disc_chan_to_add = discord_channels_set - db_channels_set
+
+    for c in db_chan_to_del:
+      info(fmt"Deleted channel {c} from DB")
+      discard query.delete_channel(c)
+
+    for c in disc_chan_to_add:
+      info(fmt"Added channel {c} to DB")
+      discard query.insert_channel(c)
+
+  for ch in discord_channels:
+    if ch.kind == ctGuildText or ch.kind == ctGuildForum:
+      let disc_ch_users_set = toHashSet(figure_channel_users(ch))
+      let db_ch_users_seq = query.get_all_channels_users(ch.id)
+
+      if db_ch_users_seq.isNone:
+        for u in disc_ch_users_set:
+          discard query.insert_channel_membership(u, ch.id)
+          info(fmt"Added user {u} to channel {ch.id} {ch.name} to DB")
+      if db_ch_users_seq.isSome:
+        let db_ch_users_set = toHashSet(db_ch_users_seq.get())
+
+        let db_user_to_del = db_ch_users_set - disc_ch_users_set
+        let disc_user_to_add = disc_ch_users_set - db_ch_users_set
+
+        for u in db_user_to_del:
+          discard query.delete_channel_membership(u, ch.id)
+          info(fmt"Deleted user {u} from channel {ch.id} {ch.name} from DB")
+        
+        for u in disc_user_to_add:
+          discard query.insert_channel_membership(u, ch.id)
+          info(fmt"Added user {u} to channel {ch.id} {ch.name} to DB")
+  info("DB users synced")
+
 proc sync_roles() {.async.} =
   var discord_roles = await discord.api.getGuildRoles(conf.discord.guild_id)
   var db_roles = query.get_all_roles()
   # populates empty db
   #echo "sync"
   if db_roles.isNone:
-    #echo "empty db"
+    info("Role DB empty")
     for r in discord_roles:
       var role_name = r.name
       var role_id = r.id
@@ -72,7 +146,7 @@ proc sync_roles() {.async.} =
 
   #db not empty
   if db_roles.isSome:
-    #echo "not empty db"
+    info("Role DB not empty")
     var discord_roles_seq: seq[string]
     var db_roles_seq: seq[string]
 
@@ -92,8 +166,6 @@ proc sync_roles() {.async.} =
     for r in db_roles_to_delete:
       info(fmt"Deleted role {r} from DB")
       discard query.delete_role(r)
-
-    #db_roles = query.get_all_roles()
 
     # then adds roles that are in Discord but not in DB
     for r in discord_roles:
@@ -139,7 +211,7 @@ proc sync_roles() {.async.} =
 
   #echo guild_members.len
 
-  info("DB synced")
+  info("DB roles synced")
 
 
 # User commands, done with slash
@@ -185,6 +257,7 @@ cmd.addSlash("kasparek", guildID = conf.discord.guild_id) do ():
   ## Zepta se tvoji mami na tvoji velikost
   randomize()
   await i.reply(fmt"{$rand(1..48)}cm")
+
 
 # Admin and mod commands, done with $$
 cmd.addChat("help") do ():
@@ -298,6 +371,7 @@ cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   await cmd.registerCommands()
   await sync_roles()
+  await sync_channels()
   info("Ready as " & $r.user)
 
 # Handle on fly role changes
@@ -332,7 +406,7 @@ proc guildMemberAdd(s: Shard, g: Guild, m: Member) {.event(discord).} =
     var roles = @[conf.discord.verified_role]
     await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some roles)
 
-# Remove roles on leaves
+# Remove roles on leave
 proc guildMemberRemove(s: Shard, g: Guild, m: Member) {.event(discord).} =
   let user_id = m.user.id
   let user_name = m.user.username
@@ -408,8 +482,7 @@ proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
 # threadDelete needs -d:nimOldCaseObjects to compile
 proc threadDelete(s: Shard, g: Guild, c: GuildChannel, exists: bool) {.event(discord).} =
   let thread_id = c.id
-#  echo "td"
-#  
+
   if c.kind == ctGuildPrivateThread:
     info(fmt"Reactions to thread {thread_id} deleted from DB")
     discard query.delete_reaction_thread(thread_id)
@@ -435,6 +508,26 @@ proc guildMemberUpdate(s: Shard; g: Guild; m: Member; o: Option[Member]) {.event
   for r in to_add:
     info(fmt"Added role {r} to user {user_id} {user_name} to DB")
     discard query.insert_role_relation(user_id, r)
+
+# Channel updates
+proc channelCreate(s: Shard, g: Option[Guild], c: Option[GuildChannel], d: Option[DMChannel]) {.event(discord).} =
+  if g.isSome:
+    if c.isSome:
+      if c.get().kind == ctGuildText or c.get().kind == ctGuildForum:
+        info(fmt"Added channel {c.get().id} {c.get().name} to DB")
+        discard query.insert_channel(c.get().id, c.get().name)
+
+proc channelDelete(s: Shard, g: Option[Guild], c: Option[GuildChannel], d: Option[DMChannel]) {.event(discord).} =
+  if g.isSome:
+    if c.isSome:
+      if c.get().kind == ctGuildText or c.get().kind == ctGuildForum:
+        info(fmt"Deleted channel {c.get().id} {c.get().name} from DB")
+        discard query.delete_channel(c.get().id)
+
+#proc channelUpdate(s: Shard, g: Guild, c: GuildChannel, o: Option[GuildChannel]) {.event(discord).} =
+  #if c.kind == ctGuildText or c.kind == ctGuildForum:
+    #echo c.permission_overwrites
+    #echo o.get().permission_overwrites
 
 # Command registration
 proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =

@@ -44,10 +44,22 @@ proc initializeDB*() =
                  role_id TEXT references roles(id) ON DELETE CASCADE
                  )"""))
 
+  db_conn.exec(sql"DROP TABLE IF EXISTS channels CASCADE")
+  db_conn.exec(sql("""CREATE TABLE channels (
+                 id TEXT PRIMARY KEY,
+                 name TEXT
+                 )"""))
+
+  db_conn.exec(sql"DROP TABLE IF EXISTS channel_membership CASCADE")
+  db_conn.exec(sql("""CREATE TABLE channel_membership (
+                 user_id TEXT references verification(id) ON DELETE CASCADE,
+                 channel_id TEXT references channels(id) ON DELETE CASCADE
+                 )"""))
+
   db_conn.exec(sql"DROP TABLE IF EXISTS react2role CASCADE")
   db_conn.exec(sql("""CREATE TABLE react2role (
                  emoji_name TEXT NOT NULL,
-                 channel_id TEXT NOT NULL,
+                 channel_id TEXT references channels(id) ON DELETE CASCADE,
                  role_id TEXT references roles(id) ON DELETE CASCADE,
                  message_id TEXT NOT NULL
                  )"""))
@@ -55,7 +67,7 @@ proc initializeDB*() =
   db_conn.exec(sql"DROP TABLE IF EXISTS react2thread CASCADE")
   db_conn.exec(sql("""CREATE TABLE react2thread (
                  emoji_name TEXT NOT NULL,
-                 channel_id TEXT NOT NULL,
+                 channel_id TEXT references channels(id) ON DELETE CASCADE,
                  thread_id TEXT NOT NULL,
                  message_id TEXT NOT NULL
                  )"""))
@@ -73,6 +85,10 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX rolown_id_id ON role_ownership (user_id, role_id)")
   db_conn.exec(sql"CREATE INDEX rolown_id1 ON role_ownership (user_id)")
   db_conn.exec(sql"CREATE INDEX rolown_id2 ON role_ownership (role_id)")
+
+  db_conn.exec(sql"CREATE INDEX chmem_id_id ON channel_membership (user_id, channel_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id1 ON channel_membership (user_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id2 ON channel_membership (channel_id)")
 
   db_conn.exec(sql"CREATE INDEX r2r_id ON react2role (channel_id)")
   db_conn.exec(sql"CREATE INDEX r2r_id2 ON react2role (role_id)")

@@ -184,6 +184,21 @@ proc exists_role_relation*(user_id: string, role_id: string): bool =
     error(e.msg)
     return false
 
+proc get_all_role_users*(role_id: string): Option[seq[string]] =
+  try:
+    var tmp = db.getAllRows(sql"SELECT user_id FROM role_ownership WHERE role_id = ?", role_id)
+    if tmp.len == 0:
+      return none(seq[string])
+    
+    var res: seq[string]
+    for x in tmp:
+      res.add(x[0])
+
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[string])
+
 proc get_all_user_roles*(user_id: string): Option[seq[string]] =
   try:
     var tmp = db.getAllRows(sql"SELECT role_id FROM role_ownership WHERE user_id = ?", user_id)
@@ -282,6 +297,112 @@ proc delete_reaction_thread*(thread_id: string): bool =
   try:
     db.exec(sql"DELETE FROM react2thread WHERE thread_id = ?",
         thread_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc insert_channel*(channel_id: string, name = ""): bool =
+  try:
+    db.exec(sql"INSERT INTO channels (id, name) VALUES (?, ?)",
+        channel_id, name)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc get_all_channels*(): Option[seq[Row]] =
+  try:
+    var res = db.getAllRows(sql"SELECT id, name FROM channels")
+    if res.len == 0:
+      return none(seq[Row])
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[Row])
+
+proc exists_channel*(channel_id: string): bool =
+  try:
+    var res = db.getValue(sql"SELECT * FROM channels WHERE channels = ?", channel_id)
+    if res == "":
+      return false
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc delete_channel*(channel_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM channels WHERE id = ?",
+        channel_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc insert_channel_membership*(user_id: string, channel_id: string): bool =
+  try:
+    db.exec(sql"INSERT INTO channel_membership (user_id, channel_id) VALUES (?, ?)",
+        user_id, channel_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc exists_channel_membership*(user_id: string, channel_id: string): bool =
+  try:
+    var res = db.getValue(sql"SELECT * FROM channel_membership WHERE user_id = ? AND channel_id = ?",
+        user_id, channel_id)
+    if res == "":
+      return false
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc get_all_channels_users*(channel_id: string): Option[seq[string]] =
+  try:
+    var tmp = db.getAllRows(sql"SELECT user_id FROM channel_membership WHERE channel_id = ?", channel_id)
+    if tmp.len == 0:
+      return none(seq[string])
+    
+    var res: seq[string]
+    for x in tmp:
+      res.add(x[0])
+
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[string])
+
+proc get_all_user_channels*(user_id: string): Option[seq[string]] =
+  try:
+    var tmp = db.getAllRows(sql"SELECT channel_id FROM channel_membership WHERE user_id = ?", user_id)
+    if tmp.len == 0:
+      return none(seq[string])
+    
+    var res: seq[string]
+    for x in tmp:
+      res.add(x[0])
+
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[string])
+
+proc delete_channel_membership*(user_id: string, channel_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM channel_membership WHERE user_id = ? AND channel_id = ?",
+        user_id, channel_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc delete_all_user_channel_membership*(user_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM channel_membership WHERE user_id = ?",
+        user_id)
     return true
   except DbError as e:
     error(e.msg)
