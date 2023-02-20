@@ -360,7 +360,7 @@ proc exists_channel_membership*(user_id: string, channel_id: string): bool =
     error(e.msg)
     return false
 
-proc get_all_channels_users*(channel_id: string): Option[seq[string]] =
+proc get_all_channel_users*(channel_id: string): Option[seq[string]] =
   try:
     var tmp = db.getAllRows(sql"SELECT user_id FROM channel_membership WHERE channel_id = ?", channel_id)
     if tmp.len == 0:
