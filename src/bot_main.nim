@@ -271,6 +271,7 @@ cmd.addChat("help") do ():
             $$jail <uzivatel>
             $$unjail <uzivatel>
             $$add-role-reaction <emoji> <id role> <id zpravy> (nepodporuje custom emoji)
+            $$add-channel-reaction <emoji> <room id> <id zpravy> (pouze na male roomky, nepodporuje custom emoji)
             $$spawn-priv-threads <jmeno vlaken> <pocet>
 
             Prikazi nemaji moc kontrol tam dobre checkujte co pisete
@@ -333,7 +334,20 @@ cmd.addChat("add-role-reaction") do (emoji_name: string, role_id: string, messag
     return
   let room_id = msg.channel_id
   if room_id in conf.discord.reaction_channels:
-    if insert_role_reaction(emoji_name, room_id, role_id, message_id):
+    if query.insert_role_reaction(emoji_name, room_id, role_id, message_id):
+      await discord.api.addMessageReaction(room_id, message_id, emoji_name)
+      discard await msg.reply("Povoleno")
+    else:
+      discard await msg.reply("Nastala chyba")
+  else:
+    discard await msg.reply("Vyber roli reakcemi neni na tomto kanale povolen.")
+
+cmd.addChat("add-channel-reaction") do (emoji_name: string, target_id: string, message_id: string):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  let room_id = msg.channel_id
+  if room_id in conf.discord.reaction_channels:
+    if query.insert_chan_reaction(emoji_name, room_id, target_id, message_id):
       await discord.api.addMessageReaction(room_id, message_id, emoji_name)
       discard await msg.reply("Povoleno")
     else:
@@ -426,19 +440,39 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
   let msg_id = m.id
   let emoji_name = e.name.get()
   #var member_roles = discord.api.getGuildMember(conf.discord.guild_id, user_id)
-  var member_roles: seq[string]
-  var q = query.get_all_user_roles(user_id)
-  if q.isSome:
-    member_roles = q.get()
+  #var member_roles: seq[string]
+  #var q = query.get_all_user_roles(user_id)
+  #if q.isSome:
+  #  member_roles = q.get()
 
-  # Assign role
   if room_id in conf.discord.reaction_channels:
+    # Assign role
     var role_to_give = query.get_reaction_role(emoji_name, room_id, msg_id)
     if role_to_give != "":
       await discord.api.addGuildMemberRole(conf.discord.guild_id, user_id, role_to_give)
-      #member_roles.add(role_to_give)
+      return
 
-      #discard await discord.api.sendMessage(m.channelId, fmt"name {emoji_name} role {role_to_give}")
+    # Assign channel via permission overwrite
+    var channel_to_give = query.get_reaction_chan(emoji_name, room_id, msg_id)
+    if channel_to_give != "":
+      var the_chan = await discord.api.getChannel(channel_to_give)
+      if the_chan[0].isSome:
+        var over_perms = the_chan[0].get().permission_overwrites
+        if not over_perms.hasKey(user_id):
+          over_perms[user_id] = Overwrite()
+          over_perms[user_id].id = user_id
+          over_perms[user_id].kind = 1
+          over_perms[user_id].allow = {permViewChannel}
+          over_perms[user_id].deny = {}
+        else:
+          if over_perms[user_id].kind == 1:
+            over_perms[user_id].allow = over_perms[user_id].allow + {permViewChannel}
+        var new_over_perms: seq[Overwrite]
+        for x, y in over_perms:
+          new_over_perms.add(y)
+        discard await discord.api.editGuildChannel(channel_to_give, permission_overwrites = some new_over_perms)
+      return
+
   if room_id in conf.discord.thread_react_channels:
     var thread_to_give = query.get_reaction_thread(emoji_name, room_id, msg_id)
     if thread_to_give != "":
@@ -456,14 +490,35 @@ proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: b
   if q.isSome:
     member_roles = q.get()
 
-  # Remove assigned role
+  
   if room_id in conf.discord.reaction_channels:
+    # Remove assigned role
     var role_to_del = query.get_reaction_role(emoji_name, room_id, msg_id)
     var new_role_list = filter(member_roles, proc(x: string): bool = x != role_to_del)
 
-    await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some new_role_list)
+    if toHashSet(member_roles) != toHashSet(new_role_list):
+      await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some new_role_list)
+      return
 
-    #discard await discord.api.sendMessage(m.channelId, fmt"name {emoji_name} role {role_to_del}")
+    # Remove assigned channel via permission overwrite
+    var channel_to_del = query.get_reaction_chan(emoji_name, room_id, msg_id)
+    var the_chan = await discord.api.getChannel(channel_to_del)
+    if the_chan[0].isSome:
+      var over_perms = the_chan[0].get().permission_overwrites
+      if over_perms.hasKey(user_id):
+        if over_perms[user_id].kind == 1:
+          over_perms[user_id].allow = over_perms[user_id].allow - {permViewChannel}
+          if over_perms[user_id].allow.len == 0 and over_perms[user_id].deny.len == 0:
+          #  over_perms.del(user_id)
+            await discord.api.deleteGuildChannelPermission(channel_to_del, user_id)
+
+      var new_over_perms: seq[Overwrite]
+      for x, y in over_perms:
+        new_over_perms.add(y)
+      discard await discord.api.editGuildChannel(channel_to_del, permission_overwrites = some new_over_perms)
+      return
+
+    
   if room_id in conf.discord.thread_react_channels:
     var thread_to_del = query.get_reaction_thread(emoji_name, room_id, msg_id)
     if thread_to_del != "":
@@ -478,6 +533,7 @@ proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
 
   if room_id in conf.discord.reaction_channels:
     discard query.delete_reaction_message(room_id, msg_id)
+    discard query.delete_chan_react_message(room_id, msg_id)
   if room_id in conf.discord.thread_react_channels:
     discard query.delete_reaction2thread_message(room_id, msg_id)
 
@@ -527,6 +583,7 @@ proc channelDelete(s: Shard, g: Option[Guild], c: Option[GuildChannel], d: Optio
         if query.delete_channel(c.get().id):
           info(fmt"Deleted channel {c.get().id} {c.get().name} from DB")
 
+# Handles adding users view permission overwrites
 proc channelUpdate(s: Shard, g: Guild, c: GuildChannel, o: Option[GuildChannel]) {.event(discord).} =
   if c.kind == ctGuildText or c.kind == ctGuildForum:
     let channel_id = c.id

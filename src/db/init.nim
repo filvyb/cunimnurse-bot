@@ -16,11 +16,14 @@ proc initializeDB*() =
   db_conn.exec(sql"DROP TABLE IF EXISTS verification CASCADE")
   # Status
   # 0 = unverified, 1 = pending, 2 = verified, 3 = banned, 4 = jailed
+  # uni_pos
+  # 0 = student, 2 = graduate, 3 = teacher, 4 = host
   db_conn.exec(sql("""CREATE TABLE verification (
                  id TEXT PRIMARY KEY,
                  login TEXT UNIQUE,
                  code VARCHAR(12),
                  status INTEGER default 0 CHECK(status >= 0),
+                 uni_pos INTEGER default 0 CHECK(uni_pos >= 0),
                  joined TIMESTAMPTZ default NOW()
                  )"""))
 
@@ -72,6 +75,14 @@ proc initializeDB*() =
                  message_id TEXT NOT NULL
                  )"""))
 
+  db_conn.exec(sql"DROP TABLE IF EXISTS react2chan CASCADE")
+  db_conn.exec(sql("""CREATE TABLE react2chan (
+                 emoji_name TEXT NOT NULL,
+                 channel_id TEXT references channels(id) ON DELETE CASCADE,
+                 target_channel_id TEXT references channels(id) ON DELETE CASCADE,
+                 message_id TEXT NOT NULL
+                 )"""))
+
 
   # Indexes
   db_conn.exec(sql"CREATE INDEX ver_log ON verification (login)")
@@ -103,3 +114,10 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX r2t_id2_id3 ON react2thread (thread_id, message_id)")
   db_conn.exec(sql"CREATE INDEX r2t_id_id2_id3 ON react2thread (channel_id, thread_id, message_id)")
   db_conn.exec(sql"CREATE INDEX r2t_name_id_id2_id3 ON react2thread (emoji_name, channel_id, thread_id, message_id)")
+
+  db_conn.exec(sql"CREATE INDEX r2c_id ON react2chan (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id2 ON react2chan (target_channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id3 ON react2chan (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id2_id3 ON react2chan (target_channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id_id2_id3 ON react2chan (channel_id, target_channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_name_id_id2_id3 ON react2chan (emoji_name, channel_id, target_channel_id, message_id)")

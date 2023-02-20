@@ -15,11 +15,11 @@ cd cunimnurse-bot
 ```
 You can build it with
 ```bash
-nimble build -d:ssl -d:discordCompress -d:nimOldCaseObjects -d:release
+nimble build -d:ssl -d:discordCompress -d:release
 ```
 or build and immidietly install it with
 ```bash
-nimble install -d:ssl -d:discordCompress -d:nimOldCaseObjects -d:release
+nimble install -d:ssl -d:discordCompress -d:release
 ```
 
 ### Running

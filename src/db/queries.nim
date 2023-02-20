@@ -407,3 +407,38 @@ proc delete_all_user_channel_membership*(user_id: string): bool =
   except DbError as e:
     error(e.msg)
     return false
+
+proc insert_chan_reaction*(emoji_name: string, channel_id: string, target_id: string, message_id: string): bool =
+  try:
+    db.exec(sql"INSERT INTO react2chan (emoji_name, channel_id, target_channel_id, message_id) VALUES (?, ?, ?, ?)",
+        emoji_name, channel_id, target_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc get_reaction_chan*(emoji_name: string, channel_id: string, message_id: string): string =
+  try:
+    var res = db.getValue(sql"SELECT target_channel_id FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND message_id = ?", emoji_name, channel_id, message_id)
+    return res
+  except DbError as e:
+    error(e.msg)
+    return ""
+
+proc delete_chan_reaction*(emoji_name: string, channel_id: string, target_id: string, message_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND target_channel_id = ? AND message_id = ?",
+        emoji_name, channel_id, target_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc delete_chan_react_message*(channel_id: string, message_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM react2chan WHERE channel_id = ? AND message_id = ?",
+        channel_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
