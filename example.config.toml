@@ -7,6 +7,7 @@ thread_react_channels = ["id", "id2"]
 verified_role = "id"
 moderator_role = "id"
 admin_role = "id"
+pin_vote_count = 5
 
 [database]
 host = "localhost"

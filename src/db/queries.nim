@@ -78,6 +78,20 @@ proc get_verified_users*(): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
+proc get_user*(id: string): Option[seq[string]] =
+  try:
+    var res = db.getRow(sql"SELECT * FROM verification where id = ?", id)
+
+    if res[0] == "":
+      return none(seq[string])
+    
+    var ret = @[res[0], res[1], res[2], res[3], res[4], res[5]]
+
+    return some(ret)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[string])
+
 proc delete_user*(id: string): bool =
   try:
     db.exec(sql"DELETE FROM verification WHERE id = ?",

@@ -12,6 +12,7 @@ type
     verified_role*: string
     moderator_role*: string
     admin_role*: string
+    pin_vote_count*: int
   DatabaseConf* = object of RootObj
     host*: string
     port*: string
@@ -64,6 +65,7 @@ proc initConfig(): Config =
     for x in tmp2:
       tmpseq2.add(x.getStr())
     result.discord.thread_react_channels = tmpseq2
+    result.discord.pin_vote_count = d["pin_vote_count"].getInt()
 
     var db = x["database"]
     result.database = DatabaseConf()

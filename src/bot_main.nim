@@ -20,7 +20,7 @@ import logging as clogger
 let conf = config.conf
 
 let discord* = newDiscordClient(conf.discord.token)
-var cmd = discord.newHandler()
+var cmd* = discord.newHandler()
 
 proc figure_channel_users(c: GuildChannel): seq[string] =
   var over_perms = c.permission_overwrites
@@ -259,6 +259,11 @@ cmd.addSlash("kasparek", guildID = conf.discord.guild_id) do ():
   randomize()
   await i.reply(fmt"{$rand(1..48)}cm")
 
+cmd.addSlash("roll", guildID = conf.discord.guild_id) do (num1: int, num2: int):
+  ## Hodit kostkou
+  randomize()
+  await i.reply(fmt"{$rand(num1..num2)}")
+
 
 # Admin and mod commands, done with $$
 cmd.addChat("help") do ():
@@ -273,6 +278,8 @@ cmd.addChat("help") do ():
             $$add-role-reaction <emoji> <id role> <id zpravy> (nepodporuje custom emoji)
             $$add-channel-reaction <emoji> <room id> <id zpravy> (pouze na male roomky, nepodporuje custom emoji)
             $$spawn-priv-threads <jmeno vlaken> <pocet>
+            $$whois <uzivatel>
+            $$whoisid <id uzivatele>
 
             Prikazi nemaji moc kontrol tam dobre checkujte co pisete
             """
@@ -380,7 +387,32 @@ cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
       if threads_done >= thread_number:
         break
       threads_done += 1
-      #echo p
+
+cmd.addChat("whois") do (user: Option[User]):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  if user.isSome:
+    var user = user.get()
+    var user_db = query.get_user(user.id)
+    if user_db.isSome:
+      var user_db = user_db.get()
+      var embfields = @[EmbedField(name: "ID", value: user_db[0]),
+                      EmbedField(name: "Login", value: user_db[1]),
+                      EmbedField(name: "Status", value: user_db[3]),
+                      EmbedField(name: "Position", value: user_db[4]),
+                      EmbedField(name: "Joined", value: user_db[5])]
+      var the_embed = Embed(title: some "whois", description: some user.username & "#" & user.discriminator, fields: some embfields)
+      
+      discard await discord.api.sendMessage(msg.channel_id, embeds = @[the_embed])
+
+cmd.addChat("whoisid") do (user_id: string):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  try:
+    var user = await discord.api.getUser(user_id)
+    discard await msg.reply(user.username & "#" & user.discriminator)
+  except:
+    discard await msg.reply("Uzivatel nenalezen")
     
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
@@ -473,10 +505,29 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
         discard await discord.api.editGuildChannel(channel_to_give, permission_overwrites = some new_over_perms)
       return
 
+  let channel_obj = await discord.api.getChannel(room_id)
+  # Pins
+  if channel_obj[0].isSome:
+    if emoji_name == "📌":
+      let pins = await discord.api.getChannelPins(room_id)
+      var pins_seq: seq[string]
+      for p in pins:
+        pins_seq.add(p.id)
+      if msg_id in pins_seq:
+        return
+      else:
+        var reacts = await discord.api.getMessageReactions(room_id, msg_id, "📌")
+        if reacts.len >= conf.discord.pin_vote_count:
+          await discord.api.addChannelMessagePin(room_id, msg_id)
+          await discord.api.deleteMessageReactionEmoji(room_id, msg_id, "📌")
+
+  # Changed order so that people can pin in rocnik threads
   if room_id in conf.discord.thread_react_channels:
     var thread_to_give = query.get_reaction_thread(emoji_name, room_id, msg_id)
     if thread_to_give != "":
       await discord.api.addThreadMember(thread_to_give, user_id)
+    return
+
 
 proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: bool) {.event(discord).} =
   if u.bot: return
@@ -510,6 +561,7 @@ proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: b
           over_perms[user_id].allow = over_perms[user_id].allow - {permViewChannel}
           if over_perms[user_id].allow.len == 0 and over_perms[user_id].deny.len == 0:
           #  over_perms.del(user_id)
+          # TODO function doesn't seem to work
             await discord.api.deleteGuildChannelPermission(channel_to_del, user_id)
 
       var new_over_perms: seq[Overwrite]
@@ -518,11 +570,11 @@ proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: b
       discard await discord.api.editGuildChannel(channel_to_del, permission_overwrites = some new_over_perms)
       return
 
-    
   if room_id in conf.discord.thread_react_channels:
     var thread_to_del = query.get_reaction_thread(emoji_name, room_id, msg_id)
     if thread_to_del != "":
       await discord.api.removeThreadMember(thread_to_del, user_id)
+
 
 # Remove react 2 roles/threads
 proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
@@ -538,7 +590,6 @@ proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
     discard query.delete_reaction2thread_message(room_id, msg_id)
 
 # Delete reaction to enter threads
-# threadDelete needs -d:nimOldCaseObjects to compile
 proc threadDelete(s: Shard, g: Guild, c: GuildChannel, exists: bool) {.event(discord).} =
   let thread_id = c.id
 
