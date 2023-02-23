@@ -45,6 +45,15 @@ proc update_verified_status*(id: string, stat: int): bool =
     error(e.msg)
     return false
 
+proc update_verified_status_login*(login: string, stat: int): bool =
+  try:
+    db.exec(sql"UPDATE verification SET status = ? WHERE login = ?",
+        stat, login)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
 proc get_user_verification_status*(id: string): int =
   try:
     var res = db.getValue(sql"SELECT status FROM verification WHERE id = ?", id)

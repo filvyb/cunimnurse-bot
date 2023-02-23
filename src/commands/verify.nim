@@ -17,7 +17,7 @@ proc send_verification_mail*(login: string) {.async} =
     code[i] = sample(chars)
 
   discard insert_code(login, code)
-  discard update_verified_status(login, 1)
+  discard update_verified_status_login(login, 1)
 
   var headers = [("From", conf.user)]#, ("MIME-Version", "1.0"), ("Content-Type", "plain/text")]
 

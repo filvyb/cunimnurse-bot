@@ -222,7 +222,7 @@ cmd.addSlash("verify", guildID = conf.discord.guild_id) do (login: string):
   if i.channel_id.get() == conf.discord.verify_channel:
     var res = query.insert_user(i.member.get().user.id, login, 0)
     if res == false:
-      await i.reply(fmt"Už tě tu mame. Kontaktuj adminy/moderátory pokud nemás přístup")
+      await i.reply(fmt"Už tě tu máme. Kontaktuj adminy/moderátory pokud nemás přístup")
     else:
       await send_verification_mail(login)
       await i.reply(fmt"Email poslán")
@@ -234,7 +234,7 @@ cmd.addSlash("resetverify", guildID = conf.discord.guild_id) do ():
   let user_id = i.member.get().user.id
   if i.channel_id.get() == conf.discord.verify_channel:
     var user_stat = query.get_user_verification_status(user_id)
-    if user_stat == 1:
+    if user_stat == 1 or user_stat == 0:
       discard query.delete_user(user_id)
       await i.reply(fmt"Můžeš použit znovu /verify")
     elif user_stat > 1:
