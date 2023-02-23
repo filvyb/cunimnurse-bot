@@ -21,8 +21,8 @@ proc send_verification_mail*(login: string) {.async} =
 
   var headers = [("From", conf.user)]#, ("MIME-Version", "1.0"), ("Content-Type", "plain/text")]
 
-  var msg = createMessage("Kod pro 1LF Discord",
-                        fmt"Ahoj. Zde je tvuj overovaci kod: {code}. Napis mi ho do DM ve formatu: !overit <kod>  (bez zobacku)",
+  var msg = createMessage("Kód pro LF1 Discord",
+                        fmt"Ahoj. Zde je tvůj ověřovací kód: {code}. Napiš ho botovi do DM ve formátu: !overit <kod>  (bez zobáčků)",
                         @[fmt"{login}@{conf.verify_domain}"], @[""], headers)
   let smtpConn = newAsyncSmtp(useSsl = conf.ssl)
   await smtpConn.connect(conf.address, Port conf.port)

@@ -90,6 +90,12 @@ proc initializeDB*() =
                  message_id TEXT NOT NULL
                  )"""))
 
+  db_conn.exec(sql"DROP TABLE IF EXISTS video_links CASCADE")
+  db_conn.exec(sql("""CREATE TABLE video_links (
+                 subject TEXT NOT NULL,
+                 link TEXT NOT NULL
+                 )"""))
+
 
   # Indexes
   db_conn.exec(sql"CREATE INDEX ver_log ON verification (login)")
@@ -134,3 +140,5 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (message_id)")
   db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (user_id, message_id)")
   db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (channel_id, message_id)")
+
+  db_conn.exec(sql"CREATE INDEX vid_sub ON video_links (subject)")

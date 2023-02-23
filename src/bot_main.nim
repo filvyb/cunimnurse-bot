@@ -15,6 +15,7 @@ import std/os
 import config
 import db/queries as query
 import commands/verify
+import commands/mason
 import logging as clogger
 
 let conf = config.conf
@@ -221,12 +222,12 @@ cmd.addSlash("verify", guildID = conf.discord.guild_id) do (login: string):
   if i.channel_id.get() == conf.discord.verify_channel:
     var res = query.insert_user(i.member.get().user.id, login, 0)
     if res == false:
-      await i.reply(fmt"Uz te tu mame. Kontaktuj adminy/moderatory pokud nemas pristup")
+      await i.reply(fmt"Už tě tu mame. Kontaktuj adminy/moderátory pokud nemás přístup")
     else:
       await send_verification_mail(login)
-      await i.reply(fmt"Email poslan")
+      await i.reply(fmt"Email poslán")
   else:
-    await i.reply(fmt"Spatny kanal")
+    await i.reply(fmt"Špatný kanál")
 
 cmd.addSlash("resetverify", guildID = conf.discord.guild_id) do ():
   ## Pouzi pokud si pokazil verify
@@ -235,14 +236,14 @@ cmd.addSlash("resetverify", guildID = conf.discord.guild_id) do ():
     var user_stat = query.get_user_verification_status(user_id)
     if user_stat == 1:
       discard query.delete_user(user_id)
-      await i.reply(fmt"Pouzij znovu /verify")
+      await i.reply(fmt"Můžeš použit znovu /verify")
     elif user_stat > 1:
-      await i.reply(fmt"Neco se pokazilo. Kontaktuj adminy/moderatory")
+      await i.reply(fmt"Něco se pokazilo. Kontaktuj adminy/moderátory")
     else:
-      await i.reply(fmt"Pouzij /verify")
+      await i.reply(fmt"Použij /verify")
       
   else:
-    await i.reply(fmt"Spatny kanal")
+    await i.reply(fmt"Špatný kanal")
 
 cmd.addSlash("ping", guildID = conf.discord.guild_id) do ():
   ## latence
@@ -255,7 +256,7 @@ cmd.addSlash("ping", guildID = conf.discord.guild_id) do ():
       content= some rep)
 
 cmd.addSlash("kasparek", guildID = conf.discord.guild_id) do ():
-  ## Zepta se tvoji mami na tvoji velikost
+  ## Zeptá se tvojí mámi na tvoji velikost
   randomize()
   await i.reply(fmt"{$rand(1..48)}cm")
 
@@ -263,6 +264,10 @@ cmd.addSlash("roll", guildID = conf.discord.guild_id) do (num1: int, num2: int):
   ## Hodit kostkou
   randomize()
   await i.reply(fmt"{$rand(num1..num2)}")
+
+#cmd.addSlash("mason", guildID = conf.discord.guild_id) do (numbers: int):
+  ## Ty čísla Masone, co znamenají
+  #parse_the_numbers(numbers)
 
 
 # Admin and mod commands, done with $$
@@ -276,12 +281,12 @@ cmd.addChat("help") do ():
             $$jail <uzivatel>
             $$unjail <uzivatel>
             $$add-role-reaction <emoji> <id role> <id zpravy> (nepodporuje custom emoji)
-            $$add-channel-reaction <emoji> <room id> <id zpravy> (pouze na male roomky, nepodporuje custom emoji)
+            $$add-channel-reaction <emoji> <room id> <id zpravy> (pouze na mále roomky, nepodporuje custom emoji)
             $$spawn-priv-threads <jmeno vlaken> <pocet>
             $$whois <uzivatel>
             $$whoisid <id uzivatele>
 
-            Prikazi nemaji moc kontrol tam dobre checkujte co pisete
+            Příkazi nemají moc kontrol tak si dávejte pozor co píšete
             """
   discard await msg.reply(text)
 
@@ -298,15 +303,15 @@ cmd.addChat("forceverify") do (user: Option[User]):
         randomize()
         q = query.insert_user(user_id, fmt"forced_{$rand(1..100000)}", 2)
       await discord.api.addGuildMemberRole(conf.discord.guild_id, user_id, conf.discord.verified_role)
-      discard await msg.reply("Uzivatel byl overen")
+      discard await msg.reply("Uživatel byl ověřen")
     elif ver_stat == 2:
-      discard await msg.reply("Uzivatel byl uz overen")
+      discard await msg.reply("Uzivatel byl uz ověřen")
     else:
       discard query.update_verified_status(user_id, 2)
-      discard await msg.reply("Uzivatel byl overen")
+      discard await msg.reply("Uživatel byl ověřen")
 
   else:
-    discard await msg.reply("Uzivatel nenalezen")
+    discard await msg.reply("Uživatel nenalezen")
 
 cmd.addChat("change_role_power") do (id: string, power: int):
   if query.get_user_power_level(msg.author.id) <= 3:
@@ -322,8 +327,9 @@ cmd.addChat("jail") do (user: Option[User]):
     discard query.update_verified_status(user_id, 4)
     var empty_role: seq[string]
     await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some empty_role)
+    discard await msg.reply("Uživatel uvězněn")
   else:
-    discard await msg.reply("Uzivatel nenalezen")
+    discard await msg.reply("Uživatel nenalezen")
 
 cmd.addChat("unjail") do (user: Option[User]):
   if query.get_user_power_level(msg.author.id) <= 2:
@@ -333,8 +339,9 @@ cmd.addChat("unjail") do (user: Option[User]):
     discard query.update_verified_status(user_id, 2)
     var roles = @[conf.discord.verified_role]
     await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some roles)
+    discard await msg.reply("Uživatel osvobozen")
   else:
-    discard await msg.reply("Uzivatel nenalezen")
+    discard await msg.reply("Uživatel nenalezen")
 
 cmd.addChat("add-role-reaction") do (emoji_name: string, role_id: string, message_id: string):
   if query.get_user_power_level(msg.author.id) <= 2:
@@ -347,7 +354,7 @@ cmd.addChat("add-role-reaction") do (emoji_name: string, role_id: string, messag
     else:
       discard await msg.reply("Nastala chyba")
   else:
-    discard await msg.reply("Vyber roli reakcemi neni na tomto kanale povolen.")
+    discard await msg.reply("Vyběr rolí reakcemi neni na tomto kanále povolen.")
 
 cmd.addChat("add-channel-reaction") do (emoji_name: string, target_id: string, message_id: string):
   if query.get_user_power_level(msg.author.id) <= 2:
@@ -360,7 +367,7 @@ cmd.addChat("add-channel-reaction") do (emoji_name: string, target_id: string, m
     else:
       discard await msg.reply("Nastala chyba")
   else:
-    discard await msg.reply("Vyber roli reakcemi neni na tomto kanale povolen.")
+    discard await msg.reply("Výber rolí reakcemi není na tomto kanále povolen.")
 
 cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
   if query.get_user_power_level(msg.author.id) <= 2:
@@ -412,7 +419,7 @@ cmd.addChat("whoisid") do (user_id: string):
     var user = await discord.api.getUser(user_id)
     discard await msg.reply(user.username & "#" & user.discriminator)
   except:
-    discard await msg.reply("Uzivatel nenalezen")
+    discard await msg.reply("Uživatel nenalezen")
     
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
@@ -680,4 +687,4 @@ proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     if check_msg_for_verification_code(content, author_id) == true:
       await discord.api.addGuildMemberRole(conf.discord.guild_id, author_id, conf.discord.verified_role)
       discard query.update_verified_status(author_id, 2)
-      discard await msg.reply("Vitej na nasem serveru")
+      discard await msg.reply("Vítej na našem serveru")
