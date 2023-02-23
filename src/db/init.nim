@@ -138,7 +138,7 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX book_id ON bookmarks (user_id)")
   db_conn.exec(sql"CREATE INDEX book_id2 ON bookmarks (channel_id)")
   db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (message_id)")
-  db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (user_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX book_id_id3 ON bookmarks (user_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX book_id2_id3 ON bookmarks (channel_id, message_id)")
 
   db_conn.exec(sql"CREATE INDEX vid_sub ON video_links (subject)")
