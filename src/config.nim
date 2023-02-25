@@ -28,11 +28,14 @@ type
     password*: string
   LogConf* = object of RootObj
     path*: string
+  UtilsConf* = object of RootObj
+    url_fetch_script*: string
   Config* = object of RootObj
     discord*: DiscordConf
     database*: DatabaseConf
     email*: EmailConf
     log*: LogConf
+    utils*: UtilsConf
 
 
 proc initConfig(): Config =
@@ -87,6 +90,10 @@ proc initConfig(): Config =
     var l = x["log"]
     result.log = LogConf()
     result.log.path = l["path"].getStr()
+
+    var u = x["utils"]
+    result.utils = UtilsConf()
+    result.utils.url_fetch_script = u["url_fetch_script"].getStr()
 
   except CatchableError as e:
     stderr.writeLine("Can't load config")

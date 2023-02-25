@@ -265,10 +265,18 @@ cmd.addSlash("roll", guildID = conf.discord.guild_id) do (num1: int, num2: int):
   randomize()
   await i.reply(fmt"{$rand(num1..num2)}")
 
-#cmd.addSlash("mason", guildID = conf.discord.guild_id) do (numbers: int):
+cmd.addSlash("mason", guildID = conf.discord.guild_id) do (numbers: int):
   ## Ty čísla Masone, co znamenají
-  #parse_the_numbers(numbers)
-
+  await i.reply("Premyslim")
+  var num_result = parse_the_numbers(numbers)
+  if num_result.isNone:
+    var rep = "Mason cisla nezna"
+    discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
+      content= some rep)
+  if num_result.isSome:
+    var rep = num_result.get()
+    discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
+      content= some rep)
 
 # Admin and mod commands, done with $$
 cmd.addChat("help") do ():
@@ -285,6 +293,7 @@ cmd.addChat("help") do ():
             $$spawn-priv-threads <jmeno vlaken> <pocet>
             $$whois <uzivatel>
             $$whoisid <id uzivatele>
+            $$create-room-role <jmeno role/kanalu> <id kategorie> (jmeno bez mezer)
 
             Příkazi nemají moc kontrol tak si dávejte pozor co píšete
             """
@@ -394,6 +403,17 @@ cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
       if threads_done >= thread_number:
         break
       threads_done += 1
+
+cmd.addChat("create-room-role") do (name: string, category_id: string):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  var myrole = await discord.api.createGuildRole(conf.discord.guild_id, name, permissions = PermObj(allowed: {}, denied: {}))
+  echo myrole
+  #discard await discord.api.editGuildRolePosition(conf.discord.guild_id, myrole.id, some 2)
+  #echo myrole
+  let perm_over = @[Overwrite(id: myrole.id, kind: 0, allow: {permViewChannel}, deny: {})]
+  let new_chan = await discord.api.createGuildChannel(conf.discord.guild_id, name, 0, some category_id, some name, permission_overwrites = some perm_over)
+  discard await msg.reply("Vytvoren kanal " & new_chan.id & " roli " & myrole.id)
 
 cmd.addChat("whois") do (user: Option[User]):
   if query.get_user_power_level(msg.author.id) <= 2:
@@ -570,6 +590,7 @@ proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: b
           #  over_perms.del(user_id)
           # TODO function doesn't seem to work
             await discord.api.deleteGuildChannelPermission(channel_to_del, user_id)
+            return
 
       var new_over_perms: seq[Overwrite]
       for x, y in over_perms:
@@ -666,6 +687,13 @@ proc channelUpdate(s: Shard, g: Guild, c: GuildChannel, o: Option[GuildChannel])
       for u in disc_user_to_add:
         if query.insert_channel_membership(u, channel_id):
           info(fmt"Added user {u} to channel {channel_id} {channel_name} to DB")
+
+# Handle bans
+proc guildBanAdd(s: Shard, g: Guild, u: User) {.event(discord).} =
+  discard query.update_verified_status(u.id, 3)
+
+proc guildBanRemove(s: Shard, g: Guild, u: User) {.event(discord).} =
+  discard query.update_verified_status(u.id, 2)
 
 # Command registration
 proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =

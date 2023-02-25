@@ -12,5 +12,5 @@ bin           = @["cunimnurse_bot"]
 
 requires "nim >= 1.6.10"
 requires "parsetoml >= 0.7.0"
-requires "https://github.com/krisppurg/dimscord#5efe765"
+requires "https://github.com/krisppurg/dimscord#a70436b"
 requires "dimscmd >= 1.3.4"

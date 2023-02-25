@@ -26,3 +26,6 @@ password = "password"
 
 [log]
 path = "cunim.log"
+
+[utils]
+url_fetch_script = "utils/url_fetch.py"
