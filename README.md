@@ -6,7 +6,7 @@ Discord bot for 1LFCUNI written in Nim
 * Postgresql
 * [Nim Lang](https://nim-lang.org/install.html) 1.6.10 or higher (should work with lower versions but I'm not testing it)
 * OpenSSL
-* Optional: Python with [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver)
+* Optional: Python3 with [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver)
 
 ### Build or install
 Clone the repo

@@ -9,8 +9,9 @@ import std/random
 import std/sequtils
 import std/sets
 import std/logging
-import std/math
 import std/os
+import std/math
+import std/json
 
 import config
 import db/queries as query
@@ -267,16 +268,52 @@ cmd.addSlash("roll", guildID = conf.discord.guild_id) do (num1: int, num2: int):
 
 cmd.addSlash("mason", guildID = conf.discord.guild_id) do (numbers: int):
   ## Ty čísla Masone, co znamenají
-  await i.reply("Premyslim")
+  let chan = await discord.api.getChannel(i.channel_id.get())
+  #if i.
+  await i.reply("Přemýslím")
   var num_result = parse_the_numbers(numbers)
-  if num_result.isNone:
-    var rep = "Mason cisla nezna"
+  if num_result[0].isNone:
+    var rep = "Mason tyhle čísla nezná"
     discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
       content= some rep)
-  if num_result.isSome:
-    var rep = num_result.get()
+  if num_result[0].isSome:
+    #let rep = num_result[0].get()["title"]["english"].getStr()
+    let name = num_result[0].get()["title"]["pretty"].getStr()
+    let author = num_result[0].get(){"artist"}.getStr()
+    let group = num_result[0].get(){"group"}.getStr()
+    let lang = num_result[0].get(){"language"}.getStr()
+    let tags = num_result[0].get()["tags"].getElems()
+    var tagstr: seq[string]
+
+    for t in tags:
+      tagstr.add(t.getStr())
+
+    var eroembed = Embed()
+    eroembed.title = some name
+    eroembed.url = some "https://nhentai.net/g/" & $numbers
+    var fields: seq[EmbedField]
+
+    if author != "":
+      #eroembed.author = some EmbedAuthor(name: author, url: some "https://nhentai.net/artist/" & author)
+      #eroembed.footer = some EmbedFooter(text: author)
+      fields.add(EmbedField(name: "Artist", value: author))
+    if group != "":
+      fields.add(EmbedField(name: "Group", value: group))
+    if lang != "":
+      fields.add(EmbedField(name: "Language", value: lang))
+    if not ("lolicon" in tagstr or "shotacon" in tagstr):
+      eroembed.image = some EmbedImage(url: num_result[1].get())
+    
+    var tagfield = EmbedField(name: "Tags", value: "")
+    for t in tagstr:
+      tagfield.value = tagfield.value & " | " & t
+    
+    fields.add(tagfield)
+
+    eroembed.fields = some fields
+
     discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
-      content= some rep)
+      embeds= @[eroembed])
 
 # Admin and mod commands, done with $$
 cmd.addChat("help") do ():
