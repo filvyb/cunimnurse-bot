@@ -269,8 +269,9 @@ cmd.addSlash("roll", guildID = conf.discord.guild_id) do (num1: int, num2: int):
 cmd.addSlash("mason", guildID = conf.discord.guild_id) do (numbers: int):
   ## Ty čísla Masone, co znamenají
   let chan = await discord.api.getChannel(i.channel_id.get())
-  #if i.
-  await i.reply("Přemýslím")
+  let is_nsfw = chan[0].get().nsfw
+
+  await i.reply("...")
   var num_result = parse_the_numbers(numbers)
   if num_result[0].isNone:
     var rep = "Mason tyhle čísla nezná"
@@ -290,7 +291,8 @@ cmd.addSlash("mason", guildID = conf.discord.guild_id) do (numbers: int):
 
     var eroembed = Embed()
     eroembed.title = some name
-    eroembed.url = some "https://nhentai.net/g/" & $numbers
+    if is_nsfw:
+      eroembed.url = some "https://nhentai.net/g/" & $numbers
     var fields: seq[EmbedField]
 
     if author != "":
@@ -301,7 +303,7 @@ cmd.addSlash("mason", guildID = conf.discord.guild_id) do (numbers: int):
       fields.add(EmbedField(name: "Group", value: group))
     if lang != "":
       fields.add(EmbedField(name: "Language", value: lang))
-    if not ("lolicon" in tagstr or "shotacon" in tagstr):
+    if not ("lolicon" in tagstr or "shotacon" in tagstr) or is_nsfw:
       eroembed.image = some EmbedImage(url: num_result[1].get())
     
     var tagfield = EmbedField(name: "Tags", value: "")
