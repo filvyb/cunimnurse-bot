@@ -87,7 +87,8 @@ proc initializeDB*() =
   db_conn.exec(sql("""CREATE TABLE bookmarks (
                  user_id TEXT references verification(id),
                  channel_id TEXT references channels(id) ON DELETE CASCADE,
-                 message_id TEXT NOT NULL
+                 message_id TEXT NOT NULL,
+                 interaction_id TEXT NOT NULL
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS video_links CASCADE")
@@ -140,5 +141,21 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (message_id)")
   db_conn.exec(sql"CREATE INDEX book_id_id3 ON bookmarks (user_id, message_id)")
   db_conn.exec(sql"CREATE INDEX book_id2_id3 ON bookmarks (channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX book_id_id4 ON bookmarks (user_id, interaction_id)")
 
   db_conn.exec(sql"CREATE INDEX vid_sub ON video_links (subject)")
+
+  if conf.slave:
+    db_conn.exec(sql("""CREATE FUNCTION do_not_change()
+                          RETURNS TRIGGER
+                        AS
+                        $$
+                        BEGIN
+                          RAISE EXCEPTION 'This tables is set as slave table.';
+                        END;
+                        $$
+                        language plpgsql"""))
+
+    db_conn.exec(sql("""CREATE TRIGGER no_change_trigger
+                          BEFORE INSERT OR UPDATE OR DELETE ON "verification"
+                          EXECUTE PROCEDURE do_not_change()"""))

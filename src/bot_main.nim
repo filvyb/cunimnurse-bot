@@ -333,6 +333,7 @@ cmd.addChat("help") do ():
             $$whois <uzivatel>
             $$whoisid <id uzivatele>
             $$create-room-role <jmeno role/kanalu> <id kategorie> (jmeno bez mezer)
+            $$make-teacher <uzivatel>
 
             Příkazi nemají moc kontrol tak si dávejte pozor co píšete
             """
@@ -347,9 +348,10 @@ cmd.addChat("forceverify") do (user: Option[User]):
     if ver_stat == -1:
       randomize()
       var q = query.insert_user(user_id, fmt"forced_{$rand(1..100000)}", 2)
-      while q == false:
-        randomize()
-        q = query.insert_user(user_id, fmt"forced_{$rand(1..100000)}", 2)
+      if q == false:
+        discard await msg.reply("Příkaz selhal")
+        return
+        
       await discord.api.addGuildMemberRole(conf.discord.guild_id, user_id, conf.discord.verified_role)
       discard await msg.reply("Uživatel byl ověřen")
     elif ver_stat == 2:
@@ -372,7 +374,10 @@ cmd.addChat("jail") do (user: Option[User]):
     return
   if user.isSome():
     let user_id = user.get().id
-    discard query.update_verified_status(user_id, 4)
+    let q = query.update_verified_status(user_id, 4)
+    if q == false:
+      discard await msg.reply("Příkaz selhal")
+      return
     var empty_role: seq[string]
     await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some empty_role)
     discard await msg.reply("Uživatel uvězněn")
@@ -384,10 +389,27 @@ cmd.addChat("unjail") do (user: Option[User]):
     return
   if user.isSome():
     let user_id = user.get().id
-    discard query.update_verified_status(user_id, 2)
+    let q = query.update_verified_status(user_id, 2)
+    if q == false:
+      discard await msg.reply("Příkaz selhal")
+      return
     var roles = @[conf.discord.verified_role]
     await discord.api.editGuildMember(conf.discord.guild_id, user_id, roles = some roles)
     discard await msg.reply("Uživatel osvobozen")
+  else:
+    discard await msg.reply("Uživatel nenalezen")
+
+cmd.addChat("make-teacher") do (user: Option[User]):
+  if query.get_user_power_level(msg.author.id) <= 2:
+    return
+  if user.isSome():
+    let user_id = user.get().id
+    let q = query.update_user_position(user_id, 3)
+    if q == false:
+      discard await msg.reply("Příkaz selhal")
+      return
+    await discord.api.addGuildMemberRole(conf.discord.guild_id, user_id, conf.discord.teacher_role)
+    discard await msg.reply("Uživatel nastaven jake učitel")
   else:
     discard await msg.reply("Uživatel nenalezen")
 

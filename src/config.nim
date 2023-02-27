@@ -12,6 +12,7 @@ type
     verified_role*: string
     moderator_role*: string
     admin_role*: string
+    teacher_role*: string
     pin_vote_count*: int
   DatabaseConf* = object of RootObj
     host*: string
@@ -19,6 +20,7 @@ type
     user*: string
     password*: string
     dbname*: string
+    slave*: bool
   EmailConf* = object of RootObj
     verify_domain*: string
     address*: string
@@ -58,6 +60,7 @@ proc initConfig(): Config =
     result.discord.verified_role = d["verified_role"].getStr()
     result.discord.moderator_role = d["moderator_role"].getStr()
     result.discord.admin_role = d["admin_role"].getStr()
+    result.discord.teacher_role = d["teacher_role"].getStr()
     var tmp = d["reaction_channels"].getElems()
     var tmpseq: seq[string]
     for x in tmp:
@@ -77,6 +80,7 @@ proc initConfig(): Config =
     result.database.user = db["user"].getStr()
     result.database.password = db["password"].getStr()
     result.database.dbname = db["dbname"].getStr()
+    result.database.slave = db["slave"].getBool()
 
     var e = x["email"]
     result.email = EmailConf()
