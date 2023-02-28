@@ -126,7 +126,6 @@ proc sync_roles() {.async.} =
   var discord_roles = await discord.api.getGuildRoles(conf.discord.guild_id)
   var db_roles = query.get_all_roles()
   # populates empty db
-  #echo "sync"
   if db_roles.isNone:
     info("Role DB empty")
     for r in discord_roles:
@@ -136,10 +135,12 @@ proc sync_roles() {.async.} =
       var power = 1
 
       if role_id == conf.discord.admin_role:
-        power = 3
+        power = 4
       elif role_manag:
-        power = 3
+        power = 4
       elif role_id == conf.discord.moderator_role:
+        power = 3
+      elif role_id == conf.discord.helper_role:
         power = 2
       elif role_name == "@everyone":
         power = 0
@@ -364,13 +365,13 @@ cmd.addChat("forceverify") do (user: Option[User]):
     discard await msg.reply("Uživatel nenalezen")
 
 cmd.addChat("change_role_power") do (id: string, power: int):
-  if query.get_user_power_level(msg.author.id) <= 3:
+  if query.get_user_power_level(msg.author.id) <= 4:
     return
   var res = query.update_role_power(id, power)
   discard await msg.reply($res)
 
 cmd.addChat("jail") do (user: Option[User]):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   if user.isSome():
     let user_id = user.get().id
@@ -385,7 +386,7 @@ cmd.addChat("jail") do (user: Option[User]):
     discard await msg.reply("Uživatel nenalezen")
 
 cmd.addChat("unjail") do (user: Option[User]):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   if user.isSome():
     let user_id = user.get().id
@@ -400,7 +401,7 @@ cmd.addChat("unjail") do (user: Option[User]):
     discard await msg.reply("Uživatel nenalezen")
 
 cmd.addChat("make-teacher") do (user: Option[User]):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   if user.isSome():
     let user_id = user.get().id
@@ -414,7 +415,7 @@ cmd.addChat("make-teacher") do (user: Option[User]):
     discard await msg.reply("Uživatel nenalezen")
 
 cmd.addChat("add-role-reaction") do (emoji_name: string, role_id: string, message_id: string):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   let room_id = msg.channel_id
   if room_id in conf.discord.reaction_channels:
@@ -427,7 +428,7 @@ cmd.addChat("add-role-reaction") do (emoji_name: string, role_id: string, messag
     discard await msg.reply("Vyběr rolí reakcemi neni na tomto kanále povolen.")
 
 cmd.addChat("add-channel-reaction") do (emoji_name: string, target_id: string, message_id: string):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   let room_id = msg.channel_id
   if room_id in conf.discord.reaction_channels:
@@ -440,7 +441,7 @@ cmd.addChat("add-channel-reaction") do (emoji_name: string, target_id: string, m
     discard await msg.reply("Výber rolí reakcemi není na tomto kanále povolen.")
 
 cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   let room_id = msg.channel_id
   var msg_count = ceilDiv(thread_number, 10)
@@ -466,18 +467,16 @@ cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
       threads_done += 1
 
 cmd.addChat("create-room-role") do (name: string, category_id: string):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   var myrole = await discord.api.createGuildRole(conf.discord.guild_id, name, permissions = PermObj(allowed: {}, denied: {}))
-  echo myrole
-  #discard await discord.api.editGuildRolePosition(conf.discord.guild_id, myrole.id, some 2)
-  #echo myrole
+  discard await discord.api.editGuildRolePosition(conf.discord.guild_id, myrole.id, some 3)
   let perm_over = @[Overwrite(id: myrole.id, kind: 0, allow: {permViewChannel}, deny: {})]
   let new_chan = await discord.api.createGuildChannel(conf.discord.guild_id, name, 0, some category_id, some name, permission_overwrites = some perm_over)
   discard await msg.reply("Vytvoren kanal " & new_chan.id & " roli " & myrole.id)
 
 cmd.addChat("whois") do (user: Option[User]):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   if user.isSome:
     var user = user.get()
@@ -494,7 +493,7 @@ cmd.addChat("whois") do (user: Option[User]):
       discard await discord.api.sendMessage(msg.channel_id, embeds = @[the_embed])
 
 cmd.addChat("whoisid") do (user_id: string):
-  if query.get_user_power_level(msg.author.id) <= 2:
+  if query.get_user_power_level(msg.author.id) <= 3:
     return
   try:
     var user = await discord.api.getUser(user_id)

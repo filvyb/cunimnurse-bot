@@ -8,6 +8,7 @@ verified_role = "id"
 moderator_role = "id"
 admin_role = "id"
 teacher_role = "id"
+helper_role = "id"
 pin_vote_count = 5
 
 [database]

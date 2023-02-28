@@ -1,0 +1,20 @@
+[Unit]
+Description=Cunim Bot %i
+# This service should be restarted when the cunimbot target is restarted.
+PartOf=cunimbot.target
+ReloadPropagatedFrom=cunimbot.target
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=discord
+Group=discord
+ExecStart=/home/discord/cunimnurse-bot/cunimnurse_bot %i
+ExecReload=/bin/kill -HUP $MAINPID
+WorkingDirectory=/home/discord/cunimnurse-bot
+SyslogIdentifier=cunimbot-%i
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=cunimbot.target

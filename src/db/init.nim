@@ -21,6 +21,7 @@ proc initializeDB*() =
   db_conn.exec(sql("""CREATE TABLE verification (
                  id TEXT PRIMARY KEY,
                  login TEXT UNIQUE,
+                 name TEXT,
                  code VARCHAR(12),
                  status INTEGER default 0 CHECK(status >= 0),
                  uni_pos INTEGER default 0 CHECK(uni_pos >= 0),
@@ -34,7 +35,7 @@ proc initializeDB*() =
 
   db_conn.exec(sql"DROP TABLE IF EXISTS roles CASCADE")
   # Power
-  # 0 = unverified, 1 = verified, 2 = mod, 3 = admin
+  # 0 = unverified, 1 = verified, 2 = mod, 3 = helper, 4 = admin
   db_conn.exec(sql("""CREATE TABLE roles (
                  id TEXT PRIMARY KEY,
                  name TEXT,
@@ -94,7 +95,17 @@ proc initializeDB*() =
   db_conn.exec(sql"DROP TABLE IF EXISTS video_links CASCADE")
   db_conn.exec(sql("""CREATE TABLE video_links (
                  subject TEXT NOT NULL,
+                 user TEXT TEXT NOT NULL,
+                 name TEXT NOT NULL,
                  link TEXT NOT NULL
+                 )"""))
+
+  db_conn.exec(sql"DROP TABLE IF EXISTS media_dedupe CASCADE")
+  db_conn.exec(sql("""CREATE TABLE media_dedupe (
+                 channel_id TEXT references channels(id) ON DELETE CASCADE,
+                 message_id TEXT NOT NULL,
+                 media_id TEXT NOT NULL,
+                 hash TEXT NOT NULL
                  )"""))
 
 
@@ -144,6 +155,16 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX book_id_id4 ON bookmarks (user_id, interaction_id)")
 
   db_conn.exec(sql"CREATE INDEX vid_sub ON video_links (subject)")
+
+  db_conn.exec(sql"CREATE INDEX med_id ON media_dedupe (channel_id)")
+  db_conn.exec(sql"CREATE INDEX med_id2 ON media_dedupe (message_id)")
+  db_conn.exec(sql"CREATE INDEX med_hash ON media_dedupe (hash)")
+  db_conn.exec(sql"CREATE INDEX med_id_hash ON media_dedupe (channel_id, hash)")
+  db_conn.exec(sql"CREATE INDEX med_id3_hash ON media_dedupe (media_id, hash)")
+  db_conn.exec(sql"CREATE INDEX med_id_id2 ON media_dedupe (channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX med_id_id3 ON media_dedupe (channel_id, media_id)")
+  db_conn.exec(sql"CREATE INDEX med_id_id2_id3 ON media_dedupe (channel_id, message_id, media_id)")
+
 
   if conf.slave:
     db_conn.exec(sql("""CREATE FUNCTION do_not_change()

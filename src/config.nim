@@ -12,6 +12,7 @@ type
     verified_role*: string
     moderator_role*: string
     admin_role*: string
+    helper_role*: string
     teacher_role*: string
     pin_vote_count*: int
   DatabaseConf* = object of RootObj
@@ -59,6 +60,7 @@ proc initConfig(): Config =
     result.discord.verify_channel = d["verify_channel"].getStr()
     result.discord.verified_role = d["verified_role"].getStr()
     result.discord.moderator_role = d["moderator_role"].getStr()
+    result.discord.helper_role = d["helper_role"].getStr()
     result.discord.admin_role = d["admin_role"].getStr()
     result.discord.teacher_role = d["teacher_role"].getStr()
     var tmp = d["reaction_channels"].getElems()
