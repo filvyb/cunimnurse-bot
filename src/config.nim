@@ -1,11 +1,12 @@
 import parsetoml
 
 import std/os
+import std/unicode
 
 type
   DiscordConf* = object of RootObj
     token*: string
-    guild_id*: string
+    #guild_id*: string
     verify_channel*: string
     reaction_channels*: seq[string]
     thread_react_channels*: seq[string]
@@ -21,7 +22,7 @@ type
     user*: string
     password*: string
     dbname*: string
-    slave*: bool
+    #slave*: bool
   EmailConf* = object of RootObj
     verify_domain*: string
     address*: string
@@ -56,13 +57,13 @@ proc initConfig(): Config =
     var d = x["discord"]
     result.discord = DiscordConf()
     result.discord.token = d["token"].getStr()
-    result.discord.guild_id = d["guild_id"].getStr()
+    #result.discord.guild_id = d["guild_id"].getStr()
     result.discord.verify_channel = d["verify_channel"].getStr()
-    result.discord.verified_role = d["verified_role"].getStr()
-    result.discord.moderator_role = d["moderator_role"].getStr()
-    result.discord.helper_role = d["helper_role"].getStr()
-    result.discord.admin_role = d["admin_role"].getStr()
-    result.discord.teacher_role = d["teacher_role"].getStr()
+    result.discord.verified_role = d["verified_role"].getStr().toLower()
+    result.discord.moderator_role = d["moderator_role"].getStr().toLower()
+    result.discord.helper_role = d["helper_role"].getStr().toLower()
+    result.discord.admin_role = d["admin_role"].getStr().toLower()
+    result.discord.teacher_role = d["teacher_role"].getStr().toLower()
     var tmp = d["reaction_channels"].getElems()
     var tmpseq: seq[string]
     for x in tmp:
@@ -82,7 +83,7 @@ proc initConfig(): Config =
     result.database.user = db["user"].getStr()
     result.database.password = db["password"].getStr()
     result.database.dbname = db["dbname"].getStr()
-    result.database.slave = db["slave"].getBool()
+    #result.database.slave = db["slave"].getBool()
 
     var e = x["email"]
     result.email = EmailConf()

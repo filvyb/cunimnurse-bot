@@ -1,14 +1,13 @@
 [discord]
 token = "bot_token"
-guild_id = "id"
 verify_channel = "id"
 reaction_channels = ["id", "id2"]
 thread_react_channels = ["id", "id2"]
-verified_role = "id"
-moderator_role = "id"
-admin_role = "id"
-teacher_role = "id"
-helper_role = "id"
+verified_role = "role name"
+moderator_role = "role name"
+admin_role = "role name"
+teacher_role = "role name"
+helper_role = "role name"
 pin_vote_count = 5
 
 [database]
@@ -17,7 +16,6 @@ port = "5432"
 user = "user"
 password = "password"
 dbname = "dbname"
-slave = false
 
 [email]
 verify_domain = "mail.tld"

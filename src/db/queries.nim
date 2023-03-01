@@ -18,6 +18,8 @@ proc check_scheme*(): string =
     ret = ""
   return ret
 
+
+# User queries
 proc insert_user*(id: string, login: string, stat: int): bool =
   try:
     db.exec(sql"INSERT INTO verification (id, login, status) VALUES (?, ?, ?)",
@@ -119,36 +121,39 @@ proc delete_user*(id: string): bool =
     error(e.msg)
     return false
 
-proc insert_role*(id: string, name: string, power: int): bool =
+
+# Role queries
+proc insert_role*(guild_id: string, id: string, name: string, power: int): bool =
   try:
-    db.exec(sql"INSERT INTO roles (id, name, power) VALUES (?, ?, ?)",
-        id, name, power)
+    db.exec(sql"INSERT INTO roles (guild_id, id, name, power) VALUES (?, ?, ?, ?)",
+        guild_id, id, name, power)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc update_role_name*(id: string, name: string): bool =
+proc update_role_name*(guild_id: string, id: string, name: string): bool =
   try:
-    db.exec(sql"UPDATE roles SET name = ? WHERE id = ?",
-        name, id)
+    db.exec(sql"UPDATE roles SET name = ? WHERE id = ? AND guild_id = ?",
+        name, id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc update_role_power*(id: string, power: int): bool =
+proc update_role_power*(guild_id: string, id: string, power: int): bool =
   try:
-    db.exec(sql"UPDATE roles SET power = ? WHERE id = ?",
-        power, id)
+    db.exec(sql"UPDATE roles SET power = ? WHERE id = ? AND guild_id = ?",
+        power, id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc get_role*(id: string): Option[seq[string]] =
+proc get_role*(guild_id: string, id: string): Option[seq[string]] =
   try:
-    var res = db.getRow(sql"SELECT * FROM roles where id = ?", id)
+    var res = db.getRow(sql"SELECT id, name, power FROM roles WHERE id = ? AND guild_id = ?",
+        id, guild_id)
 
     var ret = @[res[0], res[1], res[2]]
 
@@ -157,9 +162,9 @@ proc get_role*(id: string): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
-proc get_role_bool*(id: string): bool =
+proc get_role_bool*(guild_id: string, id: string): bool =
   try:
-    var res = get_role(id).get()
+    var res = get_role(guild_id, id).get()
     if res[0] == "" and res[1] == "" and res[2] == "":
       return false
     return true
@@ -167,9 +172,23 @@ proc get_role_bool*(id: string): bool =
     error(e.msg)
     return false
 
-proc get_all_roles*(): Option[seq[Row]] =
+proc get_role_id_name*(guild_id: string, name: string): Option[string] =
   try:
-    var res = db.getAllRows(sql"SELECT id, name FROM roles")
+    var res = db.getValue(sql"SELECT id FROM roles WHERE name = ? AND guild_id = ?",
+        name, guild_id)
+
+    if res == "":
+      return none(string)
+
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(string)
+
+proc get_all_roles*(guild_id: string): Option[seq[Row]] =
+  try:
+    var res = db.getAllRows(sql"SELECT id, name FROM roles WHERE guild_id = ?",
+        guild_id)
     if res.len == 0:
       return none(seq[Row])
     return some(res)
@@ -177,18 +196,19 @@ proc get_all_roles*(): Option[seq[Row]] =
     error(e.msg)
     return none(seq[Row])
 
-proc delete_role*(id: string): bool =
+proc delete_role*(guild_id: string, id: string): bool =
   try:
-    db.exec(sql"DELETE FROM roles WHERE id = ?",
-        id)
+    db.exec(sql"DELETE FROM roles WHERE id = ? AND guild_id = ?",
+        id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc get_user_power_level*(id: string): int =
+proc get_user_power_level*(guild_id: string, id: string): int =
   try:
-    var res = db.getValue(sql"SELECT r.power FROM roles r, role_ownership o WHERE o.user_id = ? GROUP BY r.power ORDER BY r.power DESC", id)
+    var res = db.getValue(sql"SELECT r.power FROM roles r, role_ownership o WHERE o.user_id = ? AND o.guild_id = ? GROUP BY r.power ORDER BY r.power DESC",
+        id, guild_id)
     if res == "":
       return -1
     return parseInt(res)
@@ -196,19 +216,21 @@ proc get_user_power_level*(id: string): int =
     error(e.msg)
     return -1
 
-proc insert_role_relation*(user_id: string, role_id: string): bool =
+
+# Role relation queries
+proc insert_role_relation*(guild_id: string, user_id: string, role_id: string): bool =
   try:
-    db.exec(sql"INSERT INTO role_ownership (user_id, role_id) VALUES (?, ?)",
-        user_id, role_id)
+    db.exec(sql"INSERT INTO role_ownership (user_id, role_id, guild_id) VALUES (?, ?, ?)",
+        user_id, role_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc exists_role_relation*(user_id: string, role_id: string): bool =
+proc exists_role_relation*(guild_id: string, user_id: string, role_id: string): bool =
   try:
-    var res = db.getValue(sql"SELECT * FROM role_ownership WHERE user_id = ? AND role_id = ?",
-        user_id, role_id)
+    var res = db.getValue(sql"SELECT * FROM role_ownership WHERE user_id = ? AND role_id = ? AND guild_id = ?",
+        user_id, role_id, guild_id)
     if res == "":
       return false
     return true
@@ -216,9 +238,10 @@ proc exists_role_relation*(user_id: string, role_id: string): bool =
     error(e.msg)
     return false
 
-proc get_all_role_users*(role_id: string): Option[seq[string]] =
+proc get_all_role_users*(guild_id: string, role_id: string): Option[seq[string]] =
   try:
-    var tmp = db.getAllRows(sql"SELECT user_id FROM role_ownership WHERE role_id = ?", role_id)
+    var tmp = db.getAllRows(sql"SELECT user_id FROM role_ownership WHERE role_id = ? AND guild_id = ?",
+        role_id, guild_id)
     if tmp.len == 0:
       return none(seq[string])
     
@@ -231,9 +254,10 @@ proc get_all_role_users*(role_id: string): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
-proc get_all_user_roles*(user_id: string): Option[seq[string]] =
+proc get_all_user_roles*(guild_id: string, user_id: string): Option[seq[string]] =
   try:
-    var tmp = db.getAllRows(sql"SELECT role_id FROM role_ownership WHERE user_id = ?", user_id)
+    var tmp = db.getAllRows(sql"SELECT role_id FROM role_ownership WHERE user_id = ? AND guild_id = ?",
+        user_id, guild_id)
     if tmp.len == 0:
       return none(seq[string])
     
@@ -246,106 +270,112 @@ proc get_all_user_roles*(user_id: string): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
-proc delete_role_relation*(user_id: string, role_id: string): bool =
+proc delete_role_relation*(guild_id: string, user_id: string, role_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM role_ownership WHERE user_id = ? AND role_id = ?",
-        user_id, role_id)
+    db.exec(sql"DELETE FROM role_ownership WHERE user_id = ? AND role_id = ? AND guild_id = ?",
+        user_id, role_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc delete_all_user_role_relation*(user_id: string): bool =
+proc delete_all_user_role_relation*(guild_id: string, user_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM role_ownership WHERE user_id = ?",
-        user_id)
+    db.exec(sql"DELETE FROM role_ownership WHERE user_id = ? AND guild_id = ?",
+        user_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc insert_role_reaction*(emoji_name: string, channel_id: string, role_id: string, message_id: string): bool =
+
+# React2role queries
+proc insert_role_reaction*(guild_id: string, emoji_name: string, channel_id: string, role_id: string, message_id: string): bool =
   try:
-    db.exec(sql"INSERT INTO react2role (emoji_name, channel_id, role_id, message_id) VALUES (?, ?, ?, ?)",
-        emoji_name, channel_id, role_id, message_id)
+    db.exec(sql"INSERT INTO react2role (guild_id, emoji_name, channel_id, role_id, message_id) VALUES (?, ?, ?, ?, ?)",
+        guild_id, emoji_name, channel_id, role_id, message_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc get_reaction_role*(emoji_name: string, channel_id: string, message_id: string): string =
+proc get_reaction_role*(guild_id: string, emoji_name: string, channel_id: string, message_id: string): string =
   try:
-    var res = db.getValue(sql"SELECT role_id FROM react2role WHERE emoji_name = ? AND channel_id = ? AND message_id = ?", emoji_name, channel_id, message_id)
+    var res = db.getValue(sql"SELECT role_id FROM react2role WHERE emoji_name = ? AND channel_id = ? AND message_id = ? AND guild_id = ?",
+        emoji_name, channel_id, message_id, guild_id)
     return res
   except DbError as e:
     error(e.msg)
     return ""
 
-proc delete_role_reaction*(emoji_name: string, channel_id: string, role_id: string, message_id: string): bool =
+proc delete_role_reaction*(guild_id: string, emoji_name: string, channel_id: string, role_id: string, message_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM react2role WHERE emoji_name = ? AND channel_id = ? AND role_id = ? AND message_id = ?",
-        emoji_name, channel_id, role_id, message_id)
+    db.exec(sql"DELETE FROM react2role WHERE emoji_name = ? AND channel_id = ? AND role_id = ? AND message_id = ? AND guild_id = ?",
+        emoji_name, channel_id, role_id, message_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc delete_reaction_message*(channel_id: string, message_id: string): bool =
+proc delete_reaction_message*(guild_id: string, channel_id: string, message_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM react2role WHERE channel_id = ? AND message_id = ?",
-        channel_id, message_id)
+    db.exec(sql"DELETE FROM react2role WHERE channel_id = ? AND message_id = ? AND guild_id = ?",
+        channel_id, message_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc insert_thread_reaction*(emoji_name: string, channel_id: string, thread_id: string, message_id: string): bool =
+# React2thread queries
+proc insert_thread_reaction*(guild_id: string, emoji_name: string, channel_id: string, thread_id: string, message_id: string): bool =
   try:
-    db.exec(sql"INSERT INTO react2thread (emoji_name, channel_id, thread_id, message_id) VALUES (?, ?, ?, ?)",
-        emoji_name, channel_id, thread_id, message_id)
+    db.exec(sql"INSERT INTO react2thread (guild_id, emoji_name, channel_id, thread_id, message_id) VALUES (?, ?, ?, ?, ?)",
+        guild_id, emoji_name, channel_id, thread_id, message_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc get_reaction_thread*(emoji_name: string, channel_id: string, message_id: string): string =
+proc get_reaction_thread*(guild_id: string, emoji_name: string, channel_id: string, message_id: string): string =
   try:
-    var res = db.getValue(sql"SELECT thread_id FROM react2thread WHERE emoji_name = ? AND channel_id = ? AND message_id = ?", emoji_name, channel_id, message_id)
+    var res = db.getValue(sql"SELECT thread_id FROM react2thread WHERE emoji_name = ? AND channel_id = ? AND message_id = ? AND guild_id = ?",
+        emoji_name, channel_id, message_id, guild_id)
     return res
   except DbError as e:
     error(e.msg)
     return ""
 
-proc delete_reaction2thread_message*(channel_id: string, message_id: string): bool =
+proc delete_reaction2thread_message*(guild_id: string, channel_id: string, message_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM react2thread WHERE channel_id = ? AND message_id = ?",
-        channel_id, message_id)
+    db.exec(sql"DELETE FROM react2thread WHERE channel_id = ? AND message_id = ? AND guild_id = ?",
+        channel_id, message_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc delete_reaction_thread*(thread_id: string): bool =
+proc delete_reaction_thread*(guild_id: string, thread_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM react2thread WHERE thread_id = ?",
-        thread_id)
+    db.exec(sql"DELETE FROM react2thread WHERE thread_id = ? AND guild_id = ?",
+        thread_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc insert_channel*(channel_id: string, name = ""): bool =
+# Channel queries
+proc insert_channel*(guild_id: string, channel_id: string, name = ""): bool =
   try:
-    db.exec(sql"INSERT INTO channels (id, name) VALUES (?, ?)",
-        channel_id, name)
+    db.exec(sql"INSERT INTO channels (guild_id, id, name) VALUES (?, ?, ?)",
+        guild_id, channel_id, name)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc get_all_channels*(): Option[seq[Row]] =
+proc get_all_channels*(guild_id: string): Option[seq[Row]] =
   try:
-    var res = db.getAllRows(sql"SELECT id, name FROM channels")
+    var res = db.getAllRows(sql"SELECT id, name FROM channels WHERE guild_id = ?", guild_id)
     if res.len == 0:
       return none(seq[Row])
     return some(res)
@@ -353,9 +383,10 @@ proc get_all_channels*(): Option[seq[Row]] =
     error(e.msg)
     return none(seq[Row])
 
-proc exists_channel*(channel_id: string): bool =
+proc exists_channel*(guild_id: string, channel_id: string): bool =
   try:
-    var res = db.getValue(sql"SELECT * FROM channels WHERE channels = ?", channel_id)
+    var res = db.getValue(sql"SELECT * FROM channels WHERE channels = ? AND guild_id = ?",
+        channel_id, guild_id)
     if res == "":
       return false
     return true
@@ -363,28 +394,29 @@ proc exists_channel*(channel_id: string): bool =
     error(e.msg)
     return false
 
-proc delete_channel*(channel_id: string): bool =
+proc delete_channel*(guild_id: string, channel_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM channels WHERE id = ?",
-        channel_id)
+    db.exec(sql"DELETE FROM channels WHERE id = ? AND guild_id = ?",
+        channel_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc insert_channel_membership*(user_id: string, channel_id: string): bool =
+# Channel membership queries
+proc insert_channel_membership*(guild_id: string, user_id: string, channel_id: string): bool =
   try:
-    db.exec(sql"INSERT INTO channel_membership (user_id, channel_id) VALUES (?, ?)",
-        user_id, channel_id)
+    db.exec(sql"INSERT INTO channel_membership (user_id, channel_id, guild_id) VALUES (?, ?, ?)",
+        user_id, channel_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc exists_channel_membership*(user_id: string, channel_id: string): bool =
+proc exists_channel_membership*(guild_id: string, user_id: string, channel_id: string): bool =
   try:
-    var res = db.getValue(sql"SELECT * FROM channel_membership WHERE user_id = ? AND channel_id = ?",
-        user_id, channel_id)
+    var res = db.getValue(sql"SELECT * FROM channel_membership WHERE user_id = ? AND channel_id = ? AND guild_id = ?",
+        user_id, channel_id, guild_id)
     if res == "":
       return false
     return true
@@ -392,9 +424,10 @@ proc exists_channel_membership*(user_id: string, channel_id: string): bool =
     error(e.msg)
     return false
 
-proc get_all_channel_users*(channel_id: string): Option[seq[string]] =
+proc get_all_channel_users*(guild_id: string, channel_id: string): Option[seq[string]] =
   try:
-    var tmp = db.getAllRows(sql"SELECT user_id FROM channel_membership WHERE channel_id = ?", channel_id)
+    var tmp = db.getAllRows(sql"SELECT user_id FROM channel_membership WHERE channel_id = ? AND guild_id = ?",
+        channel_id, guild_id)
     if tmp.len == 0:
       return none(seq[string])
     
@@ -407,9 +440,10 @@ proc get_all_channel_users*(channel_id: string): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
-proc get_all_user_channels*(user_id: string): Option[seq[string]] =
+proc get_all_user_channels*(guild_id: string, user_id: string): Option[seq[string]] =
   try:
-    var tmp = db.getAllRows(sql"SELECT channel_id FROM channel_membership WHERE user_id = ?", user_id)
+    var tmp = db.getAllRows(sql"SELECT channel_id FROM channel_membership WHERE user_id = ? AND guild_id = ?",
+        user_id, guild_id)
     if tmp.len == 0:
       return none(seq[string])
     
@@ -422,54 +456,57 @@ proc get_all_user_channels*(user_id: string): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
-proc delete_channel_membership*(user_id: string, channel_id: string): bool =
+proc delete_channel_membership*(guild_id: string, user_id: string, channel_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM channel_membership WHERE user_id = ? AND channel_id = ?",
-        user_id, channel_id)
+    db.exec(sql"DELETE FROM channel_membership WHERE user_id = ? AND channel_id = ? AND guild_id = ?",
+        user_id, channel_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc delete_all_user_channel_membership*(user_id: string): bool =
+proc delete_all_user_channel_membership*(guild_id: string, user_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM channel_membership WHERE user_id = ?",
-        user_id)
+    db.exec(sql"DELETE FROM channel_membership WHERE user_id = ? AND guild_id = ?",
+        user_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc insert_chan_reaction*(emoji_name: string, channel_id: string, target_id: string, message_id: string): bool =
+
+# React2chan queries
+proc insert_chan_reaction*(guild_id: string, emoji_name: string, channel_id: string, target_id: string, message_id: string): bool =
   try:
-    db.exec(sql"INSERT INTO react2chan (emoji_name, channel_id, target_channel_id, message_id) VALUES (?, ?, ?, ?)",
-        emoji_name, channel_id, target_id, message_id)
+    db.exec(sql"INSERT INTO react2chan (guild_id, emoji_name, channel_id, target_channel_id, message_id) VALUES (?, ?, ?, ?, ?)",
+        guild_id, emoji_name, channel_id, target_id, message_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc get_reaction_chan*(emoji_name: string, channel_id: string, message_id: string): string =
+proc get_reaction_chan*(guild_id: string, emoji_name: string, channel_id: string, message_id: string): string =
   try:
-    var res = db.getValue(sql"SELECT target_channel_id FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND message_id = ?", emoji_name, channel_id, message_id)
+    var res = db.getValue(sql"SELECT target_channel_id FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND message_id = ? AND guild_id = ?",
+        emoji_name, channel_id, message_id, guild_id)
     return res
   except DbError as e:
     error(e.msg)
     return ""
 
-proc delete_chan_reaction*(emoji_name: string, channel_id: string, target_id: string, message_id: string): bool =
+proc delete_chan_reaction*(guild_id: string, emoji_name: string, channel_id: string, target_id: string, message_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND target_channel_id = ? AND message_id = ?",
-        emoji_name, channel_id, target_id, message_id)
+    db.exec(sql"DELETE FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND target_channel_id = ? AND message_id = ? AND guild_id = ?",
+        emoji_name, channel_id, target_id, message_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc delete_chan_react_message*(channel_id: string, message_id: string): bool =
+proc delete_chan_react_message*(guild_id: string, channel_id: string, message_id: string): bool =
   try:
-    db.exec(sql"DELETE FROM react2chan WHERE channel_id = ? AND message_id = ?",
-        channel_id, message_id)
+    db.exec(sql"DELETE FROM react2chan WHERE channel_id = ? AND message_id = ? AND guild_id = ?",
+        channel_id, message_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)

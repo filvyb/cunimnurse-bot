@@ -37,75 +37,95 @@ proc initializeDB*() =
   # Power
   # 0 = unverified, 1 = verified, 2 = mod, 3 = helper, 4 = admin
   db_conn.exec(sql("""CREATE TABLE roles (
-                 id TEXT PRIMARY KEY,
+                 guild_id TEXT,
+                 id TEXT,
                  name TEXT,
-                 power INTEGER default 0 CHECK(power >= 0)
+                 power INTEGER default 0 CHECK(power >= 0),
+                 PRIMARY KEY (guild_id, id)
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS role_ownership CASCADE")
   db_conn.exec(sql("""CREATE TABLE role_ownership (
                  user_id TEXT references verification(id) ON DELETE CASCADE,
-                 role_id TEXT references roles(id) ON DELETE CASCADE
+                 role_id TEXT,
+                 guild_id TEXT,
+                 FOREIGN KEY(guild_id, role_id) references roles(guild_id, id) ON DELETE CASCADE
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS channels CASCADE")
   db_conn.exec(sql("""CREATE TABLE channels (
-                 id TEXT PRIMARY KEY,
-                 name TEXT
+                 guild_id TEXT,
+                 id TEXT,
+                 name TEXT,
+                 PRIMARY KEY (guild_id, id)
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS channel_membership CASCADE")
   db_conn.exec(sql("""CREATE TABLE channel_membership (
                  user_id TEXT references verification(id) ON DELETE CASCADE,
-                 channel_id TEXT references channels(id) ON DELETE CASCADE
+                 channel_id TEXT,
+                 guild_id TEXT,
+                 FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS react2role CASCADE")
   db_conn.exec(sql("""CREATE TABLE react2role (
+                 guild_id TEXT,
                  emoji_name TEXT NOT NULL,
-                 channel_id TEXT references channels(id) ON DELETE CASCADE,
-                 role_id TEXT references roles(id) ON DELETE CASCADE,
-                 message_id TEXT NOT NULL
+                 channel_id TEXT,
+                 role_id TEXT,
+                 message_id TEXT NOT NULL,
+                 FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE,
+                 FOREIGN KEY(guild_id, role_id) references roles(guild_id, id) ON DELETE CASCADE
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS react2thread CASCADE")
   db_conn.exec(sql("""CREATE TABLE react2thread (
+                 guild_id TEXT,
                  emoji_name TEXT NOT NULL,
-                 channel_id TEXT references channels(id) ON DELETE CASCADE,
+                 channel_id TEXT,
                  thread_id TEXT NOT NULL,
-                 message_id TEXT NOT NULL
+                 message_id TEXT NOT NULL,
+                 FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS react2chan CASCADE")
   db_conn.exec(sql("""CREATE TABLE react2chan (
+                 guild_id TEXT,
                  emoji_name TEXT NOT NULL,
-                 channel_id TEXT references channels(id) ON DELETE CASCADE,
-                 target_channel_id TEXT references channels(id) ON DELETE CASCADE,
-                 message_id TEXT NOT NULL
+                 channel_id TEXT,
+                 target_channel_id TEXT,
+                 message_id TEXT NOT NULL,
+                 FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE,
+                 FOREIGN KEY(guild_id, target_channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS bookmarks CASCADE")
   db_conn.exec(sql("""CREATE TABLE bookmarks (
                  user_id TEXT references verification(id),
-                 channel_id TEXT references channels(id) ON DELETE CASCADE,
+                 guild_id TEXT,
+                 channel_id TEXT,
                  message_id TEXT NOT NULL,
-                 interaction_id TEXT NOT NULL
+                 interaction_id TEXT NOT NULL,
+                 FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS video_links CASCADE")
   db_conn.exec(sql("""CREATE TABLE video_links (
                  subject TEXT NOT NULL,
-                 user TEXT TEXT NOT NULL,
+                 username TEXT NOT NULL,
                  name TEXT NOT NULL,
                  link TEXT NOT NULL
                  )"""))
 
   db_conn.exec(sql"DROP TABLE IF EXISTS media_dedupe CASCADE")
   db_conn.exec(sql("""CREATE TABLE media_dedupe (
-                 channel_id TEXT references channels(id) ON DELETE CASCADE,
+                 guild_id TEXT,
+                 channel_id TEXT,
                  message_id TEXT NOT NULL,
                  media_id TEXT NOT NULL,
-                 hash TEXT NOT NULL
+                 hash TEXT NOT NULL,
+                 FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
 
@@ -116,56 +136,73 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX ver_id_sta ON verification (id, status)")
   db_conn.exec(sql"CREATE INDEX ver_id_cod ON verification (id, code)")
 
-  db_conn.exec(sql"CREATE INDEX rol_id_per ON roles (id, power)")
+  db_conn.exec(sql"CREATE INDEX rol_id1 ON roles (guild_id)")
+  #db_conn.exec(sql"CREATE INDEX rol_id1_id2 ON roles (guild_id, id)")
+  db_conn.exec(sql"CREATE INDEX rol_id2_pow ON roles (id, power)")
+  db_conn.exec(sql"CREATE INDEX rol_id1_id2_pow ON roles (guild_id, id, power)")
 
-  db_conn.exec(sql"CREATE INDEX rolown_id_id ON role_ownership (user_id, role_id)")
+  db_conn.exec(sql"CREATE INDEX rolown_id1_id2_id3 ON role_ownership (user_id, role_id, guild_id)")
+  db_conn.exec(sql"CREATE INDEX rolown_id1_id2 ON role_ownership (user_id, role_id)")
   db_conn.exec(sql"CREATE INDEX rolown_id1 ON role_ownership (user_id)")
   db_conn.exec(sql"CREATE INDEX rolown_id2 ON role_ownership (role_id)")
+  db_conn.exec(sql"CREATE INDEX rolown_id3 ON role_ownership (guild_id)")
 
-  db_conn.exec(sql"CREATE INDEX chmem_id_id ON channel_membership (user_id, channel_id)")
+  db_conn.exec(sql"CREATE INDEX ch_id1 ON channels (guild_id)")
+  
+  db_conn.exec(sql"CREATE INDEX chmem_id1_id2_id3 ON channel_membership (user_id, channel_id, guild_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id1_id2 ON channel_membership (user_id, channel_id)")
   db_conn.exec(sql"CREATE INDEX chmem_id1 ON channel_membership (user_id)")
   db_conn.exec(sql"CREATE INDEX chmem_id2 ON channel_membership (channel_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id3 ON channel_membership (guild_id)")
 
-  db_conn.exec(sql"CREATE INDEX r2r_id ON react2role (channel_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_id2 ON react2role (role_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_id3 ON react2role (message_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_id2_id3 ON react2role (role_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_name_id_id3 ON react2role (emoji_name, channel_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX r2r_name_id_id2_id3 ON react2role (emoji_name, channel_id, role_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id1 ON react2role (guild_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id2 ON react2role (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id3 ON react2role (role_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id4 ON react2role (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id1_id3_id4 ON react2role (guild_id, role_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id1_name_id2_id4 ON react2role (guild_id, emoji_name, channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_name_id_id2_id3_id4 ON react2role (guild_id, emoji_name, channel_id, role_id, message_id)")
 
-  db_conn.exec(sql"CREATE INDEX r2t_id ON react2thread (channel_id)")
-  db_conn.exec(sql"CREATE INDEX r2t_id2 ON react2thread (thread_id)")
-  db_conn.exec(sql"CREATE INDEX r2t_id3 ON react2thread (message_id)")
-  db_conn.exec(sql"CREATE INDEX r2t_id2_id3 ON react2thread (thread_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX r2t_id_id2_id3 ON react2thread (channel_id, thread_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX r2t_name_id_id2_id3 ON react2thread (emoji_name, channel_id, thread_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id1 ON react2thread (guild_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id2 ON react2thread (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id3 ON react2thread (thread_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id4 ON react2thread (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id3_id4 ON react2thread (thread_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id1_id2_id3_id4 ON react2thread (guild_id, channel_id, thread_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id1_name_id2_id4 ON react2thread (guild_id, emoji_name, channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_name_id1_id2_id3_id4 ON react2thread (guild_id, emoji_name, channel_id, thread_id, message_id)")
 
-  db_conn.exec(sql"CREATE INDEX r2c_id ON react2chan (channel_id)")
-  db_conn.exec(sql"CREATE INDEX r2c_id2 ON react2chan (target_channel_id)")
-  db_conn.exec(sql"CREATE INDEX r2c_id3 ON react2chan (message_id)")
-  db_conn.exec(sql"CREATE INDEX r2c_id2_id3 ON react2chan (target_channel_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX r2c_id_id2_id3 ON react2chan (channel_id, target_channel_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX r2c_name_id_id2_id3 ON react2chan (emoji_name, channel_id, target_channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id1 ON react2chan (guild_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id2 ON react2chan (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id3 ON react2chan (target_channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id4 ON react2chan (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id3_id4 ON react2chan (target_channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id1_id2_id3_id4 ON react2chan (guild_id, channel_id, target_channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id1_name_id2_id4 ON react2chan (guild_id, emoji_name, channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_name_id_id2_id3_id4 ON react2chan (guild_id, emoji_name, channel_id, target_channel_id, message_id)")
 
   db_conn.exec(sql"CREATE INDEX book_id ON bookmarks (user_id)")
-  db_conn.exec(sql"CREATE INDEX book_id2 ON bookmarks (channel_id)")
-  db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (message_id)")
+  db_conn.exec(sql"CREATE INDEX book_id2 ON bookmarks (guild_id)")
+  db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (channel_id)")
+  db_conn.exec(sql"CREATE INDEX book_id4 ON bookmarks (message_id)")
   db_conn.exec(sql"CREATE INDEX book_id_id3 ON bookmarks (user_id, message_id)")
   db_conn.exec(sql"CREATE INDEX book_id2_id3 ON bookmarks (channel_id, message_id)")
   db_conn.exec(sql"CREATE INDEX book_id_id4 ON bookmarks (user_id, interaction_id)")
 
   db_conn.exec(sql"CREATE INDEX vid_sub ON video_links (subject)")
 
-  db_conn.exec(sql"CREATE INDEX med_id ON media_dedupe (channel_id)")
-  db_conn.exec(sql"CREATE INDEX med_id2 ON media_dedupe (message_id)")
+  db_conn.exec(sql"CREATE INDEX med_id ON media_dedupe (guild_id)")
+  db_conn.exec(sql"CREATE INDEX med_id2 ON media_dedupe (channel_id)")
+  db_conn.exec(sql"CREATE INDEX med_id3 ON media_dedupe (message_id)")
   db_conn.exec(sql"CREATE INDEX med_hash ON media_dedupe (hash)")
-  db_conn.exec(sql"CREATE INDEX med_id_hash ON media_dedupe (channel_id, hash)")
+  db_conn.exec(sql"CREATE INDEX med_id2_hash ON media_dedupe (channel_id, hash)")
   db_conn.exec(sql"CREATE INDEX med_id3_hash ON media_dedupe (media_id, hash)")
-  db_conn.exec(sql"CREATE INDEX med_id_id2 ON media_dedupe (channel_id, message_id)")
-  db_conn.exec(sql"CREATE INDEX med_id_id3 ON media_dedupe (channel_id, media_id)")
-  db_conn.exec(sql"CREATE INDEX med_id_id2_id3 ON media_dedupe (channel_id, message_id, media_id)")
+  db_conn.exec(sql"CREATE INDEX med_id1_id2_hash ON media_dedupe (guild_id, channel_id, hash)")
+  db_conn.exec(sql"CREATE INDEX med_id2_id3 ON media_dedupe (channel_id, message_id)")
+  #db_conn.exec(sql"CREATE INDEX med_id2_id4 ON media_dedupe (channel_id, media_id)")
+  db_conn.exec(sql"CREATE INDEX med_id1_id2_id3_id4 ON media_dedupe (guild_id, channel_id, message_id, media_id)")
 
-
+#[
   if conf.slave:
     db_conn.exec(sql("""CREATE FUNCTION do_not_change()
                           RETURNS TRIGGER
@@ -180,3 +217,4 @@ proc initializeDB*() =
     db_conn.exec(sql("""CREATE TRIGGER no_change_trigger
                           BEFORE INSERT OR UPDATE OR DELETE ON "verification"
                           EXECUTE PROCEDURE do_not_change()"""))
+]#
