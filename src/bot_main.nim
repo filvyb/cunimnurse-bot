@@ -242,17 +242,23 @@ proc sync_roles(guild_id: string) {.async.} =
 
 
 # User commands, done with slash
+cmd.addSlash("flip") do ():
+  ## Rub či líc
+  randomize()
+  let coin = ["Rub", "líc"]
+  await i.reply(sample(coin))
+
 cmd.addSlash("verify") do (login: string):
   ## UCO
   if i.channel_id.get() == conf.discord.verify_channel:
     var res = query.insert_user(i.member.get().user.id, login, 0)
     if res == false:
-      await i.reply(fmt"Už tě tu máme. Kontaktuj adminy/moderátory pokud nemás přístup")
+      await i.reply("Už tě tu máme. Kontaktuj adminy/moderátory pokud nemás přístup")
     else:
       await send_verification_mail(login)
-      await i.reply(fmt"Email poslán")
+      await i.reply("Email poslán")
   else:
-    await i.reply(fmt"Špatný kanál")
+    await i.reply("Špatný kanál")
 
 cmd.addSlash("resetverify") do ():
   ## Pouzi pokud si pokazil verify
@@ -261,14 +267,14 @@ cmd.addSlash("resetverify") do ():
     var user_stat = query.get_user_verification_status(user_id)
     if user_stat == 1 or user_stat == 0:
       discard query.delete_user(user_id)
-      await i.reply(fmt"Můžeš použit znovu /verify")
+      await i.reply("Můžeš použit znovu /verify")
     elif user_stat > 1:
-      await i.reply(fmt"Něco se pokazilo. Kontaktuj adminy/moderátory")
+      await i.reply("Něco se pokazilo. Kontaktuj adminy/moderátory")
     else:
-      await i.reply(fmt"Použij /verify")
+      await i.reply("Použij /verify")
       
   else:
-    await i.reply(fmt"Špatný kanal")
+    await i.reply("Špatný kanal")
 
 cmd.addSlash("ping") do ():
   ## latence
