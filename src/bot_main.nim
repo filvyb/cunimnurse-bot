@@ -242,111 +242,104 @@ proc sync_roles(guild_id: string) {.async.} =
 
 
 # User commands, done with slash
-proc add_commands_to_guilds(guild_id: string) {.async.} =
-  cmd.addSlash("flip", guild_id = guild_id) do ():
-    ## Rub či líc
-    randomize()
-    let coin = ["Rub", "líc"]
-    await i.reply(sample(coin))
-
-  cmd.addSlash("verify") do (login: string):
-    ## UCO
-    if i.channel_id.get() == conf.discord.verify_channel:
-      var res = query.insert_user(i.member.get().user.id, login, 0)
-      if res == false:
-        await i.reply("Už tě tu máme. Kontaktuj adminy/moderátory pokud nemás přístup")
-      else:
-        await send_verification_mail(login)
-        await i.reply("Email poslán")
+cmd.addSlash("verify") do (login: string):
+  ## UCO
+  if i.channel_id.get() == conf.discord.verify_channel:
+    var res = query.insert_user(i.member.get().user.id, login, 0)
+    if res == false:
+      await i.reply(fmt"Už tě tu máme. Kontaktuj adminy/moderátory pokud nemás přístup")
     else:
-      await i.reply("Špatný kanál")
+      await send_verification_mail(login)
+      await i.reply(fmt"Email poslán")
+  else:
+    await i.reply(fmt"Špatný kanál")
 
-  cmd.addSlash("resetverify") do ():
-    ## Pouzi pokud si pokazil verify
-    let user_id = i.member.get().user.id
-    if i.channel_id.get() == conf.discord.verify_channel:
-      var user_stat = query.get_user_verification_status(user_id)
-      if user_stat == 1 or user_stat == 0:
-        discard query.delete_user(user_id)
-        await i.reply(fmt"Můžeš použit znovu /verify")
-      elif user_stat > 1:
-        await i.reply(fmt"Něco se pokazilo. Kontaktuj adminy/moderátory")
-      else:
-        await i.reply(fmt"Použij /verify")
-        
+cmd.addSlash("resetverify") do ():
+  ## Pouzi pokud si pokazil verify
+  let user_id = i.member.get().user.id
+  if i.channel_id.get() == conf.discord.verify_channel:
+    var user_stat = query.get_user_verification_status(user_id)
+    if user_stat == 1 or user_stat == 0:
+      discard query.delete_user(user_id)
+      await i.reply(fmt"Můžeš použit znovu /verify")
+    elif user_stat > 1:
+      await i.reply(fmt"Něco se pokazilo. Kontaktuj adminy/moderátory")
     else:
-      await i.reply(fmt"Špatný kanal")
+      await i.reply(fmt"Použij /verify")
+      
+  else:
+    await i.reply(fmt"Špatný kanal")
 
-  cmd.addSlash("ping") do ():
-    ## latence
-    let before = epochTime() * 1000
-    await i.reply("ping?")
-    let after = epochTime() * 1000
+cmd.addSlash("ping") do ():
+  ## latence
+  let before = epochTime() * 1000
+  await i.reply("ping?")
+  let after = epochTime() * 1000
 
-    var rep = "Pong trval " & $int(after - before) & "ms | " & $s.latency() & "ms."
+  var rep = "Pong trval " & $int(after - before) & "ms | " & $s.latency() & "ms."
+  discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
+      content= some rep)
+
+cmd.addSlash("kasparek") do ():
+  ## Zeptá se tvojí mámi na tvoji velikost
+  randomize()
+  await i.reply(fmt"{$rand(1..48)}cm")
+
+cmd.addSlash("roll") do (num1: int, num2: int):
+  ## Hodit kostkou
+  randomize()
+  await i.reply(fmt"{$rand(num1..num2)}")
+
+cmd.addSlash("mason") do (numbers: int):
+  ## Ty čísla Masone, co znamenají
+  let chan = await discord.api.getChannel(i.channel_id.get())
+  let is_nsfw = chan[0].get().nsfw
+
+  await i.reply("...")
+  var num_result = parse_the_numbers(numbers)
+  if num_result[0].isNone:
+    var rep = "Mason tyhle čísla nezná"
     discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
-        content= some rep)
+      content= some rep)
+  if num_result[0].isSome:
+    #let rep = num_result[0].get()["title"]["english"].getStr()
+    let name = num_result[0].get()["title"]["pretty"].getStr()
+    let author = num_result[0].get(){"artist"}.getStr()
+    let group = num_result[0].get(){"group"}.getStr()
+    let lang = num_result[0].get(){"language"}.getStr()
+    let tags = num_result[0].get()["tags"].getElems()
+    var tagstr: seq[string]
 
-  cmd.addSlash("kasparek") do ():
-    ## Zeptá se tvojí mámi na tvoji velikost
-    randomize()
-    await i.reply(fmt"{$rand(1..48)}cm")
+    for t in tags:
+      tagstr.add(t.getStr())
 
-  cmd.addSlash("roll") do (num1: int, num2: int):
-    ## Hodit kostkou
-    randomize()
-    await i.reply(fmt"{$rand(num1..num2)}")
+    var eroembed = Embed()
+    eroembed.title = some name
+    if is_nsfw:
+      eroembed.url = some "https://nhentai.net/g/" & $numbers
+    var fields: seq[EmbedField]
 
-  cmd.addSlash("mason") do (numbers: int):
-    ## Ty čísla Masone, co znamenají
-    let chan = await discord.api.getChannel(i.channel_id.get())
-    let is_nsfw = chan[0].get().nsfw
+    if author != "":
+      #eroembed.author = some EmbedAuthor(name: author, url: some "https://nhentai.net/artist/" & author)
+      #eroembed.footer = some EmbedFooter(text: author)
+      fields.add(EmbedField(name: "Artist", value: author))
+    if group != "":
+      fields.add(EmbedField(name: "Group", value: group))
+    if lang != "":
+      fields.add(EmbedField(name: "Language", value: lang))
+    if not ("lolicon" in tagstr or "shotacon" in tagstr) or is_nsfw:
+      eroembed.image = some EmbedImage(url: num_result[1].get())
+    
+    var tagfield = EmbedField(name: "Tags", value: "")
+    for t in tagstr:
+      tagfield.value = tagfield.value & " | " & t
+    
+    fields.add(tagfield)
 
-    await i.reply("...")
-    var num_result = parse_the_numbers(numbers)
-    if num_result[0].isNone:
-      var rep = "Mason tyhle čísla nezná"
-      discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
-        content= some rep)
-    if num_result[0].isSome:
-      #let rep = num_result[0].get()["title"]["english"].getStr()
-      let name = num_result[0].get()["title"]["pretty"].getStr()
-      let author = num_result[0].get(){"artist"}.getStr()
-      let group = num_result[0].get(){"group"}.getStr()
-      let lang = num_result[0].get(){"language"}.getStr()
-      let tags = num_result[0].get()["tags"].getElems()
-      var tagstr: seq[string]
+    eroembed.fields = some fields
 
-      for t in tags:
-        tagstr.add(t.getStr())
-
-      var eroembed = Embed()
-      eroembed.title = some name
-      if is_nsfw:
-        eroembed.url = some "https://nhentai.net/g/" & $numbers
-      var fields: seq[EmbedField]
-
-      if author != "":
-        #eroembed.author = some EmbedAuthor(name: author, url: some "https://nhentai.net/artist/" & author)
-        #eroembed.footer = some EmbedFooter(text: author)
-        fields.add(EmbedField(name: "Artist", value: author))
-      if group != "":
-        fields.add(EmbedField(name: "Group", value: group))
-      if lang != "":
-        fields.add(EmbedField(name: "Language", value: lang))
-      if not ("lolicon" in tagstr or "shotacon" in tagstr) or is_nsfw:
-        eroembed.image = some EmbedImage(url: num_result[1].get())
-      
-      var tagfield = EmbedField(name: "Tags", value: "")
-      for t in tagstr:
-        tagfield.value = tagfield.value & " | " & t
-      
-      fields.add(tagfield)
-
-      eroembed.fields = some fields
-
-      discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
-        embeds= @[eroembed])
+    discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
+      embeds= @[eroembed])
 
 # Admin and mod commands, done with $$
 cmd.addChat("help") do ():
@@ -579,7 +572,6 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
       guild_ids.add(g.id)
       await sync_roles(g.id)
       await sync_channels(g.id)
-      await add_commands_to_guilds(g.id)
 
   await cmd.registerCommands()
   
