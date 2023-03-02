@@ -862,5 +862,6 @@ proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
     if check_msg_for_verification_code(content, author_id) == true:
       discard query.update_verified_status(author_id, 2)
       for g in guild_ids:
-        await discord.api.addGuildMemberRole(guild_id, author_id, await get_verified_role_id(g))
+        let ver_role = await get_verified_role_id(g)
+        await discord.api.addGuildMemberRole(g, author_id, ver_role)
       discard await msg.reply("Vítej na našem serveru")
