@@ -1,11 +1,7 @@
-import std/httpclient
 import std/osproc
 import std/json
 import options
-import asyncdispatch
-import std/strutils
 import std/logging
-import std/random
 
 import ../config
 import ../logging as clogger
@@ -37,8 +33,6 @@ proc parse_the_numbers*(numbers: int): (Option[JsonNode], Option[string]) =
 
   let jtags = %tags
   newJson.add("tags", jtags)
-
-  #echo $newJson
 
   var extension = jsonWeb{"images"}{"cover"}{"t"}.getStr()
   if extension == "p":

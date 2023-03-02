@@ -25,7 +25,8 @@ proc initializeDB*() =
                  code VARCHAR(12),
                  status INTEGER default 0 CHECK(status >= 0),
                  uni_pos INTEGER default 0 CHECK(uni_pos >= 0),
-                 joined TIMESTAMPTZ default NOW()
+                 joined TIMESTAMPTZ default NOW(),
+                 karma INTEGER default 0
                  )"""))
 
   #db_conn.exec(sql"CREATE INDEX log_tsv_idx ON verification USING gin(login_tsv)")

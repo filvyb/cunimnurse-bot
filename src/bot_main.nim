@@ -55,9 +55,7 @@ proc figure_channel_users(c: GuildChannel): seq[string] =
   var over_perms = c.permission_overwrites
   var res: seq[string]
   for x, y in over_perms:
-    #echo y.repr
     if y.kind == 1 and permViewChannel in y.allow:
-      #echo y
       res.add(y.id)
     if y.kind == 0:
       let rol_users = query.get_all_role_users(c.guild_id, y.id)
@@ -358,8 +356,7 @@ cmd.addChat("help") do ():
             $$add-role-reaction <emoji> <id role> <id zpravy> (nepodporuje custom emoji)
             $$add-channel-reaction <emoji> <room id> <id zpravy> (pouze na mále roomky, nepodporuje custom emoji)
             $$spawn-priv-threads <jmeno vlaken> <pocet>
-            $$whois <uzivatel>
-            $$whoisid <id uzivatele>
+            $$whois <id uzivatele>
             $$create-room-role <jmeno role/kanalu> <id kategorie> (jmeno bez mezer)
             $$make-teacher <uzivatel>
 
@@ -536,36 +533,28 @@ cmd.addChat("create-room-role") do (name: string, category_id: string):
   let new_chan = await discord.api.createGuildChannel(guild_id, name, 0, some category_id, some name, permission_overwrites = some perm_over)
   discard await msg.reply("Vytvoren kanal " & new_chan.id & " roli " & myrole.id)
 
-cmd.addChat("whois") do (user: Option[User]):
+cmd.addChat("whois") do (user_id: string):
   if msg.guild_id.isNone:
     return
   let guild_id = msg.guild_id.get()
   if query.get_user_power_level(guild_id, msg.author.id) <= 3:
     return
-  if user.isSome:
-    var user = user.get()
-    var user_db = query.get_user(user.id)
-    if user_db.isSome:
-      var user_db = user_db.get()
-      var embfields = @[EmbedField(name: "ID", value: user_db[0]),
-                      EmbedField(name: "Login", value: user_db[1]),
-                      EmbedField(name: "Status", value: user_db[3]),
-                      EmbedField(name: "Position", value: user_db[4]),
-                      EmbedField(name: "Joined", value: user_db[5])]
-      var the_embed = Embed(title: some "whois", description: some user.username & "#" & user.discriminator, fields: some embfields)
-      
-      discard await discord.api.sendMessage(msg.channel_id, embeds = @[the_embed])
 
-cmd.addChat("whoisid") do (user_id: string):
-  if msg.guild_id.isNone:
-    return
-  let guild_id = msg.guild_id.get()
-  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
-    return
-  try:
+  var user_db = query.get_user(user_id)
+  if user_db.isSome:
+    var user_db = user_db.get()
     var user = await discord.api.getUser(user_id)
-    discard await msg.reply(user.username & "#" & user.discriminator)
-  except:
+    var embfields = @[EmbedField(name: "ID", value: user_db[0]),
+                    EmbedField(name: "Login", value: user_db[1]),
+                    EmbedField(name: "Name", value: user_db[2]),
+                    EmbedField(name: "Status", value: user_db[4]),
+                    EmbedField(name: "Position", value: user_db[5]),
+                    EmbedField(name: "Joined", value: user_db[6]),
+                    EmbedField(name: "Karma", value: user_db[7])]
+    var the_embed = Embed(title: some "whois", description: some user.username & "#" & user.discriminator, fields: some embfields)
+      
+    discard await discord.api.sendMessage(msg.channel_id, embeds = @[the_embed])
+  if user_db.isNone:
     discard await msg.reply("Uživatel nenalezen")
 
 cmd.addChat("reboot") do ():

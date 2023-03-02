@@ -105,7 +105,7 @@ proc get_user*(id: string): Option[seq[string]] =
     if res[0] == "":
       return none(seq[string])
     
-    var ret = @[res[0], res[1], res[2], res[3], res[4], res[5]]
+    var ret = @[res[0], res[1], res[2], res[3], res[4], res[5], res[6], res[7]]
 
     return some(ret)
   except DbError as e:
