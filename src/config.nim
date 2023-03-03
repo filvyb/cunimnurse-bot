@@ -10,6 +10,7 @@ type
     verify_channel*: string
     reaction_channels*: seq[string]
     thread_react_channels*: seq[string]
+    confession_channel*: string
     verified_role*: string
     moderator_role*: string
     admin_role*: string
@@ -59,6 +60,7 @@ proc initConfig(): Config =
     result.discord.token = d["token"].getStr()
     #result.discord.guild_id = d["guild_id"].getStr()
     result.discord.verify_channel = d["verify_channel"].getStr()
+    result.discord.confession_channel = d["confession_channel"].getStr()
     result.discord.verified_role = d["verified_role"].getStr().toLower()
     result.discord.moderator_role = d["moderator_role"].getStr().toLower()
     result.discord.helper_role = d["helper_role"].getStr().toLower()
