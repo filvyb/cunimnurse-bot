@@ -30,4 +30,5 @@ password = "password"
 path = "cunim.log"
 
 [utils]
+mason = false
 url_fetch_script = "utils/url_fetch.py"

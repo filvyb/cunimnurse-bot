@@ -318,6 +318,9 @@ cmd.addSlash("roll") do (num1: int, num2: int):
 
 cmd.addSlash("mason") do (numbers: int):
   ## Ty čísla Masone, co znamenají
+  if conf.utils.mason == false:
+    await i.reply("Mason utekl")
+    return
   let chan = await discord.api.getChannel(i.channel_id.get())
   let is_nsfw = chan[0].get().nsfw
 
@@ -366,6 +369,70 @@ cmd.addSlash("mason") do (numbers: int):
 
     discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
       embeds= @[eroembed])
+
+cmd.addSlash("search create") do (message: string):
+  ## Přidej koho/co hledáš
+  if i.user.isSome:
+    await i.reply("Nelze v DMs")
+    return
+  let guild_id = i.guild_id.get()
+  let channel_id = i.channel_id.get()
+  let user_id = i.member.get().user.id
+  let last_id = query.get_last_channel_search_id(guild_id, channel_id)
+  discard query.insert_search(guild_id, channel_id, user_id, last_id + 1, message)
+
+  await i.reply("Přidáno")
+
+cmd.addSlash("search list") do ():
+  ## Vypíše hledání v kanále
+  if i.user.isSome:
+    await i.reply("Nelze v DMs")
+    return
+  let guild_id = i.guild_id.get()
+  let channel_id = i.channel_id.get()
+  let user_id = i.member.get().user.id
+
+  var embfields: seq[EmbedField]
+  let searches = query.get_channel_searches(guild_id, channel_id)
+  if searches.isNone:
+    await i.reply("Seznam prázdný")
+    return
+  for q in searches.get():
+    var theuser = await discord.api.getUser(q[0])
+    var emb = EmbedField()
+    emb.name = fmt"{q[1]} - {theuser.username}#{theuser.discriminator}"
+    emb.value = q[2]
+    embfields.add(emb)
+
+  let thechan = await discord.api.getChannel(channel_id)
+
+  let finemb = Embed(title: some "Hledání v " & thechan[0].get().name, fields: some embfields)
+
+  let response = InteractionResponse(
+      kind: irtChannelMessageWithSource,
+      data: some InteractionApplicationCommandCallbackData(
+          embeds: @[finemb]
+      )
+  )
+  await discord.api.createInteractionResponse(i.id, i.token, response)
+
+cmd.addSlash("search del") do (id: int):
+  ## Odstraní tvoje hledání
+  if i.user.isSome:
+    await i.reply("Nelze v DMs")
+    return
+  let guild_id = i.guild_id.get()
+  let channel_id = i.channel_id.get()
+  let user_id = i.member.get().user.id
+
+  if query.get_search_id_user(guild_id, channel_id, id) != user_id and query.get_user_power_level(guild_id, user_id) <= 1:
+    await i.reply("Nemůžeš odstranit cizí příspěvky")
+    return
+
+  if query.delete_search(guild_id, channel_id, id):
+    await i.reply("Odebráno")
+  else:
+    await i.reply("ID nenalezeno")
 
 # Admin and mod commands, done with $$
 cmd.addChat("help") do ():

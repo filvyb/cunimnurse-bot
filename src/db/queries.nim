@@ -12,7 +12,8 @@ var db = db_conn
 proc check_scheme*(): string =
   var ret: string
   try:
-    ret = db.getValue(sql"SELECT ? FROM scheme", "*")
+    ret = db.getValue(sql"SELECT * FROM scheme")
+    return ret
   except DbError as e:
     error(e.msg)
     ret = ""
@@ -100,7 +101,7 @@ proc get_verified_users*(): Option[seq[string]] =
 
 proc get_user*(id: string): Option[seq[string]] =
   try:
-    var res = db.getRow(sql"SELECT * FROM verification where id = ?", id)
+    var res = db.getRow(sql"SELECT * FROM verification WHERE id = ?", id)
 
     if res[0] == "":
       return none(seq[string])
@@ -525,6 +526,56 @@ proc delete_chan_react_message*(guild_id: string, channel_id: string, message_id
   try:
     db.exec(sql"DELETE FROM react2chan WHERE channel_id = ? AND message_id = ? AND guild_id = ?",
         channel_id, message_id, guild_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+# Queries for searches
+proc insert_search*(guild_id: string, channel_id: string, user_id: string, search_id: int, search: string): bool =
+  try:
+    db.exec(sql"INSERT INTO searching (guild_id, channel_id, user_id, search_id, search) VALUES (?, ?, ?, ?, ?)",
+        guild_id, channel_id, user_id, search_id, search)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc get_channel_searches*(guild_id: string, channel_id: string): Option[seq[Row]] =
+  try:
+    var res = db.getAllRows(sql"SELECT user_id, search_id, search FROM searching WHERE guild_id = ? AND channel_id = ?",
+        guild_id, channel_id)
+    if res.len == 0:
+      return none(seq[Row])
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[Row])
+
+proc get_last_channel_search_id*(guild_id: string, channel_id: string): int =
+  try:
+    var res = db.getValue(sql"SELECT search_id FROM searching WHERE guild_id = ? AND channel_id = ? GROUP BY search_id ORDER BY search_id DESC",
+        guild_id, channel_id)
+    if res == "":
+      return 0
+    return parseInt(res)
+  except DbError as e:
+    error(e.msg)
+    return -1
+
+proc get_search_id_user*(guild_id: string, channel_id: string, search_id: int): string =
+  try:
+    var res = db.getValue(sql"SELECT search_id FROM searching WHERE guild_id = ? AND channel_id = ? AND search_id = ?",
+        guild_id, channel_id, search_id)
+    return res
+  except DbError as e:
+    error(e.msg)
+    return ""
+
+proc delete_search*(guild_id: string, channel_id: string, search_id: int): bool =
+  try:
+    db.exec(sql"DELETE FROM searching WHERE guild_id = ? AND channel_id = ? AND search_id = ?",
+        guild_id, channel_id, search_id)
     return true
   except DbError as e:
     error(e.msg)

@@ -34,6 +34,7 @@ type
   LogConf* = object of RootObj
     path*: string
   UtilsConf* = object of RootObj
+    mason*: bool
     url_fetch_script*: string
   Config* = object of RootObj
     discord*: DiscordConf
@@ -102,6 +103,7 @@ proc initConfig(): Config =
 
     var u = x["utils"]
     result.utils = UtilsConf()
+    result.utils.mason = u["mason"].getBool()
     result.utils.url_fetch_script = u["url_fetch_script"].getStr()
 
   except CatchableError as e:

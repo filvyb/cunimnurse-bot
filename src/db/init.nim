@@ -219,3 +219,24 @@ proc initializeDB*() =
                           BEFORE INSERT OR UPDATE OR DELETE ON "verification"
                           EXECUTE PROCEDURE do_not_change()"""))
 ]#
+
+proc migrateDB*(scheme: int) =
+  if scheme < 2:
+    db_conn.exec(sql"DROP TABLE IF EXISTS searching CASCADE")
+    db_conn.exec(sql("""CREATE TABLE searching (
+                  guild_id TEXT,
+                  channel_id TEXT,
+                  user_id TEXT references verification(id) ON DELETE CASCADE,
+                  search_id INTEGER NOT NULL CHECK(search_id >= 0),
+                  search TEXT NOT NULL,
+                  FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE,
+                  UNIQUE(guild_id, channel_id, search_id)
+                  )"""))
+
+    db_conn.exec(sql"CREATE INDEX sear_id1 ON searching (guild_id)")
+    db_conn.exec(sql"CREATE INDEX sear_id2 ON searching (channel_id)")
+    db_conn.exec(sql"CREATE INDEX sear_id3 ON searching (user_id)")
+    db_conn.exec(sql"CREATE INDEX sear_id1_id2 ON searching (guild_id, channel_id)")
+    db_conn.exec(sql"CREATE INDEX sear_id1_id2_id4 ON searching (guild_id, channel_id, search_id)")
+
+    db_conn.exec(sql"UPDATE scheme SET id = 2 WHERE id = ?", scheme)
