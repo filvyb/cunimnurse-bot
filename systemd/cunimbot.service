@@ -1,8 +1,5 @@
 [Unit]
 Description=Cunim Bot
-# This service should be restarted when the cunimbot target is restarted.
-PartOf=cunimbot.target
-ReloadPropagatedFrom=cunimbot.target
 After=network.target postgresql.service
 
 [Service]

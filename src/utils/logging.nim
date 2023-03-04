@@ -1,6 +1,6 @@
 import std/logging
 
-import config
+import ../config
 
 let conf = config.conf
 

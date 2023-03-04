@@ -5,7 +5,7 @@ import std/sequtils
 import std/logging
 
 from init import db_conn
-import logging as clogger
+import ../utils/logging as clogger
 
 var db = db_conn
 

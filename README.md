@@ -7,6 +7,7 @@ Discord bot for 1LFCUNI written in Nim
 - Reaction to get role or channel access
 - Create threads with prefix and access them with a reaction
 - Syncs bans between servers
+- Vote to add message to pins
 
 ## Usage
 ### Prerequisites:

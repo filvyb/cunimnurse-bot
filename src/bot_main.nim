@@ -18,7 +18,8 @@ import config
 import db/queries as query
 import commands/verify
 import commands/mason
-import logging as clogger
+import utils/get_emoji
+import utils/logging as clogger
 
 let conf = config.conf
 
@@ -420,7 +421,7 @@ cmd.addChat("change_role_power") do (id: string, power: int):
   if msg.guild_id.isNone:
     return
   let guild_id = msg.guild_id.get()
-  if query.get_user_power_level(guild_id, msg.author.id) <= 4:
+  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
     return
   var res = query.update_role_power(guild_id, id, power)
   discard await msg.reply($res)
@@ -429,7 +430,7 @@ cmd.addChat("jail") do (user: Option[User]):
   if msg.guild_id.isNone:
     return
   let guild_id = msg.guild_id.get()
-  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
+  if query.get_user_power_level(guild_id, msg.author.id) <= 2:
     return
   if user.isSome():
     let user_id = user.get().id
@@ -448,7 +449,7 @@ cmd.addChat("unjail") do (user: Option[User]):
   if msg.guild_id.isNone:
     return
   let guild_id = msg.guild_id.get()
-  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
+  if query.get_user_power_level(guild_id, msg.author.id) <= 2:
     return
   if user.isSome():
     let user_id = user.get().id
@@ -585,11 +586,54 @@ cmd.addChat("whois") do (user_id: string):
 cmd.addChat("reboot") do ():
   if msg.guild_id.isNone:
     return
-  if query.get_user_power_level(msg.guild_id.get(), msg.author.id) <= 4:
+  if query.get_user_power_level(msg.guild_id.get(), msg.author.id) <= 3:
     return
   info("Admin " & msg.author.id & " killing bot via reboot command")
   quit(99)
 
+cmd.addChat("sync-emojis") do ():
+  if msg.guild_id.isNone:
+    return
+  let guild_id = msg.guild_id.get()
+  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
+    return
+  let guild_emojis = await discord.api.getGuildEmojis(guild_id)
+  var guild_emojis_ids: seq[string]
+  for e in guild_emojis:
+    guild_emojis_ids.add(e.id.get())
+  let guild_emojis_ids_set = toHashSet(guild_emojis_ids)
+  echo guild_emojis
+  
+  for g in guild_ids:
+    if g != guild_id:
+      echo "syncing" & g
+      let g_emojis = await discord.api.getGuildEmojis(g)
+      var g_emojis_ids: seq[string]
+      for e in g_emojis:
+        g_emojis_ids.add(e.id.get())
+      let g_emojis_ids_set = toHashSet(g_emojis_ids)
+      echo g_emojis_ids_set
+
+      let emojis_to_del = g_emojis_ids_set - guild_emojis_ids_set
+      echo emojis_to_del
+      let emojis_to_add = guild_emojis_ids_set - g_emojis_ids_set
+      echo emojis_to_add
+
+      for e in emojis_to_del:
+        echo "del", e
+        await discord.api.deleteGuildEmoji(g, e)
+      for e in guild_emojis:
+        if e.id.get() in emojis_to_add:
+          echo e.animated.get()
+          var image = await download_emojis(e.id.get(), e.animated.get())
+          if image != "":
+            var mime = "image/png"
+            if e.animated.get():
+              mime = "image/gif"
+
+            let data_uri = "data:" & mime & ";base64," & image
+            discard await discord.api.createGuildEmoji(g, e.name.get(), data_uri)
+            echo "succ" & e.name.get()
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   for g in r.guilds:

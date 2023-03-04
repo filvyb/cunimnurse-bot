@@ -4,7 +4,7 @@ import options
 import std/logging
 
 import ../config
-import ../logging as clogger
+import ../utils/logging as clogger
 
 
 proc parse_the_numbers*(numbers: int): (Option[JsonNode], Option[string]) =
