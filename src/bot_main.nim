@@ -82,7 +82,7 @@ proc set_reaction2thread(m: Message, emoji_name: string, thread_id: string, mess
   if room_id in conf.discord.thread_react_channels:
     if insert_thread_reaction(m.guild_id.get(), emoji_name, room_id, thread_id, message_id):
       await discord.api.addMessageReaction(room_id, message_id, emoji_name)
-      #discard await m.reply("Povoleno")
+      info(fmt"Added message reaction in guild {m.guild_id.get()} room {room_id} with emoji {emoji_name} to thread {thread_id} on message {message_id}")
     else:
       discard await m.reply("Nastala chyba")
   #else:
@@ -381,6 +381,7 @@ cmd.addChat("help") do ():
             $$unjail <uzivatel>
             $$add-role-reaction <emoji> <id role> <id zpravy> (nepodporuje custom emoji)
             $$add-channel-reaction <emoji> <room id> <id zpravy> (pouze na mále roomky, nepodporuje custom emoji)
+            $$remove-emoji-reaction <emoji> <id zpravy> (nepodporuje custom emoji)
             $$spawn-priv-threads <jmeno vlaken> <pocet>
             $$whois <id uzivatele>
             $$create-room-role <jmeno role/kanalu> <id kategorie> (jmeno bez mezer)
@@ -514,6 +515,25 @@ cmd.addChat("add-channel-reaction") do (emoji_name: string, target_id: string, m
   else:
     discard await msg.reply("Výber rolí reakcemi není na tomto kanále povolen.")
 
+cmd.addChat("remove-emoji-reaction") do (emoji_name: string, message_id: string):
+  if msg.guild_id.isNone:
+    return
+  let guild_id = msg.guild_id.get()
+  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
+    return
+  let room_id = msg.channel_id
+  if room_id in conf.discord.reaction_channels:
+    if query.delete_role_emoji_reaction(guild_id, emoji_name, room_id, message_id):
+      await discord.api.deleteMessageReaction(room_id, message_id, emoji_name)
+      discard await msg.reply(fmt"{emoji_name} smazáno.")
+      return
+    if query.delete_chan_emoji_reaction(guild_id, emoji_name, room_id, message_id):
+      await discord.api.deleteMessageReaction(room_id, message_id, emoji_name)
+      discard await msg.reply(fmt"{emoji_name} smazáno.")
+      return
+  else:
+    discard await msg.reply("Vyběr rolí reakcemi neni na tomto kanále povolen.")
+
 cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
   if msg.guild_id.isNone:
     return
@@ -524,7 +544,7 @@ cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
   var msg_count = ceilDiv(thread_number, 10)
   var threads_done = 1
 
-  if room_id in conf.discord.thread_react_channels:
+  if not (room_id in conf.discord.thread_react_channels):
     discard await msg.reply("Kanál nemá povolené reakce do vláken")
     return
   
@@ -617,6 +637,7 @@ cmd.addChat("sync-emojis") do ():
 
       for e in emojis_to_del:
         await discord.api.deleteGuildEmoji(g, e)
+        info(fmt"Deleted {emojis_to_del.len} emojis from {g}")
       for e in guild_emojis:
         if e.id.get() in emojis_to_add:
           var image = await download_emoji(e.id.get(), e.animated.get())
@@ -627,6 +648,7 @@ cmd.addChat("sync-emojis") do ():
 
             let data_uri = fmt"data:{mime};base64,{image}"
             discard await discord.api.createGuildEmoji(g, e.name.get(), data_uri)
+          info(fmt"Added {emojis_to_add.len} emojis from {guild_id} to {g}")
   discard await msg.reply("Emoji sync finished")
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =

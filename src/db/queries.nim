@@ -317,6 +317,15 @@ proc delete_role_reaction*(guild_id: string, emoji_name: string, channel_id: str
     error(e.msg)
     return false
 
+proc delete_role_emoji_reaction*(guild_id: string, emoji_name: string, channel_id: string, message_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM react2role WHERE emoji_name = ? AND channel_id = ? AND message_id = ? AND guild_id = ?",
+        emoji_name, channel_id, message_id, guild_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
 proc delete_reaction_message*(guild_id: string, channel_id: string, message_id: string): bool =
   try:
     db.exec(sql"DELETE FROM react2role WHERE channel_id = ? AND message_id = ? AND guild_id = ?",
@@ -498,6 +507,15 @@ proc delete_chan_reaction*(guild_id: string, emoji_name: string, channel_id: str
   try:
     db.exec(sql"DELETE FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND target_channel_id = ? AND message_id = ? AND guild_id = ?",
         emoji_name, channel_id, target_id, message_id, guild_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc delete_chan_emoji_reaction*(guild_id: string, emoji_name: string, channel_id: string, message_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND message_id = ? AND guild_id = ?",
+        emoji_name, channel_id, message_id, guild_id)
     return true
   except DbError as e:
     error(e.msg)
