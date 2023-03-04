@@ -606,34 +606,28 @@ cmd.addChat("sync-emojis") do ():
   
   for g in guild_ids:
     if g != guild_id:
-      echo "syncing" & g
       let g_emojis = await discord.api.getGuildEmojis(g)
       var g_emojis_ids: seq[string]
       for e in g_emojis:
         g_emojis_ids.add(e.id.get())
       let g_emojis_ids_set = toHashSet(g_emojis_ids)
-      echo g_emojis_ids_set
 
       let emojis_to_del = g_emojis_ids_set - guild_emojis_ids_set
-      echo emojis_to_del
       let emojis_to_add = guild_emojis_ids_set - g_emojis_ids_set
-      echo emojis_to_add
 
       for e in emojis_to_del:
-        echo "del", e
         await discord.api.deleteGuildEmoji(g, e)
       for e in guild_emojis:
         if e.id.get() in emojis_to_add:
-          echo e.animated.get()
-          var image = await download_emojis(e.id.get(), e.animated.get())
+          var image = await download_emoji(e.id.get(), e.animated.get())
           if image != "":
             var mime = "image/png"
             if e.animated.get():
               mime = "image/gif"
 
-            let data_uri = "data:" & mime & ";base64," & image
+            let data_uri = fmt"data:{mime};base64,{image}"
             discard await discord.api.createGuildEmoji(g, e.name.get(), data_uri)
-            echo "succ" & e.name.get()
+  discard await msg.reply("Emoji sync finished")
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   for g in r.guilds:
