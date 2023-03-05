@@ -322,7 +322,11 @@ cmd.addSlash("mason") do (numbers: int):
     await i.reply("Mason utekl")
     return
   let chan = await discord.api.getChannel(i.channel_id.get())
-  let is_nsfw = chan[0].get().nsfw
+  var is_nsfw = false
+  if chan[1].isSome:
+    is_nsfw = true
+  else:
+    is_nsfw = chan[0].get().nsfw
 
   await i.reply("...")
   var num_result = parse_the_numbers(numbers)
@@ -390,7 +394,6 @@ cmd.addSlash("search list") do ():
     return
   let guild_id = i.guild_id.get()
   let channel_id = i.channel_id.get()
-  let user_id = i.member.get().user.id
 
   var embfields: seq[EmbedField]
   let searches = query.get_channel_searches(guild_id, channel_id)
@@ -702,6 +705,8 @@ cmd.addChat("sync-emojis") do ():
       let emojis_to_del = g_emojis_ids_set - guild_emojis_ids_set
       let emojis_to_add = guild_emojis_ids_set - g_emojis_ids_set
 
+      var failed_sync = 0
+
       for e in emojis_to_del:
         await discord.api.deleteGuildEmoji(g, e)
         info(fmt"Deleted {emojis_to_del.len} emojis from {g}")
@@ -714,8 +719,12 @@ cmd.addChat("sync-emojis") do ():
               mime = "image/gif"
 
             let data_uri = fmt"data:{mime};base64,{image}"
-            discard await discord.api.createGuildEmoji(g, e.name.get(), data_uri)
-          info(fmt"Added {emojis_to_add.len} emojis from {guild_id} to {g}")
+            try:
+              discard await discord.api.createGuildEmoji(g, e.name.get(), data_uri)
+            except CatchableError as e:
+              failed_sync = failed_sync + 1
+              error(e.msg)
+      info(fmt"Added {emojis_to_add.len - failed_sync} emojis from {guild_id} to {g}")
   discard await msg.reply("Emoji sync finished")
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
@@ -783,11 +792,6 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
   if m.guild_id.isSome:
     guild_id = m.guild_id.get()
   let emoji_name = e.name.get()
-  #var member_roles = discord.api.getGuildMember(conf.discord.guild_id, user_id)
-  #var member_roles: seq[string]
-  #var q = query.get_all_user_roles(user_id)
-  #if q.isSome:
-  #  member_roles = q.get()
 
   if room_id in conf.discord.reaction_channels:
     # Assign role
@@ -818,8 +822,9 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
       return
 
   let channel_obj = await discord.api.getChannel(room_id)
-  # Pins
+  # Pins and bookmarks
   if channel_obj[0].isSome:
+    # Pins
     if emoji_name == "📌":
       let pins = await discord.api.getChannelPins(room_id)
       var pins_seq: seq[string]
@@ -832,8 +837,51 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
         if reacts.len >= conf.discord.pin_vote_count:
           await discord.api.addChannelMessagePin(room_id, msg_id)
           await discord.api.deleteMessageReactionEmoji(room_id, msg_id, "📌")
+    # Bookmarks
+    if emoji_name == "🔖":
+      var post_url = "https://discord.com/channels/" & guild_id & "/" & room_id & "/" & msg_id
+      var but1 = newButton(
+                label = "Původní zpráva!",
+                idOrUrl = post_url,
+                emoji = Emoji(name: some "🔗"),
+                style = Link
+            )
+      var but2 = newButton(
+                label = "Smazat záložku!",
+                idOrUrl = "btnBookmarkDel",
+                emoji = Emoji(name: some "🗑️"),
+                style = Danger
+            )
+      var row = newActionRow(@[but1, but2])
 
-  # Changed order so that people can pin in rocnik threads
+      var user_dm = await discord.api.createUserDm(user_id)
+      let g = await discord.api.getGuild(guild_id)
+
+      var emb = Embed(title: some "Záložka na serveru " & g.name)
+      emb.author = some EmbedAuthor(name: $m.member.get().user, url: some avatarUrl(m.member.get().user))
+      var embfield = @[EmbedField(name: "Původní zpráva", value: "Empty")]
+      #echo m.member.get().user
+      
+      # messageReactionAdd bugged?
+      if m.content != "":
+        embfield[0].value = m.content
+      embfield &= EmbedField(name: "Channel", value: $channel_obj[0].get())
+      emb.fields = some embfield
+      #var out_msg = ""
+      for at in m.attachments:
+        if at.content_type.isSome:
+          if at.content_type.get() in ["image/jpeg", "image/png", "image/gif"] and emb.image.isNone:
+            emb.image = some EmbedImage(url: at.url)
+        #else:
+        #  out_msg = out_msg & at.url & '\n'
+
+      discard await discord.api.sendMessage(
+            user_dm.id,
+            components = @[row],
+            embeds = @[emb]
+        )
+
+  # Changed order so that people can pin and bookmark in rocnik threads
   if room_id in conf.discord.thread_react_channels:
     var thread_to_give = query.get_reaction_thread(guild_id, emoji_name, room_id, msg_id)
     if thread_to_give != "":
@@ -991,9 +1039,18 @@ proc guildBanRemove(s: Shard, g: Guild, u: User) {.event(discord).} =
     if gid != g.id:
       await discord.api.createGuildBan(g.id, u.id)
 
-# Command registration
+# Handling handling
 proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
-  discard await cmd.handleInteraction(s, i)
+  let guild_id = i.guild_id
+  let data = i.data.get()
+  # Command handling
+  if i.kind == itApplicationCommand:
+    discard await cmd.handleInteraction(s, i)
+    return
+
+  # Bookmark delete handling
+  if data.custom_id == "btnBookmarkDel":
+    await discord.api.deleteMessage(i.channel_id.get(), i.message.get().id)
 
 proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
   if msg.author.bot: return
