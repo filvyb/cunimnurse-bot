@@ -8,6 +8,7 @@ Discord bot for 1LFCUNI written in Nim
 - Create threads with prefix and access them with a reaction
 - Syncs bans between servers
 - Vote to add message to pins
+- Bookmarks
 
 ## Usage
 ### Prerequisites:

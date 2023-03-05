@@ -856,19 +856,20 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
 
       var user_dm = await discord.api.createUserDm(user_id)
       let g = await discord.api.getGuild(guild_id)
+      var ms = m
+      if not exists:
+        ms = await discord.api.getChannelMessage(room_id, msg_id)
 
       var emb = Embed(title: some "Záložka na serveru " & g.name)
-      emb.author = some EmbedAuthor(name: $m.member.get().user, url: some avatarUrl(m.member.get().user))
+      emb.author = some EmbedAuthor(name: $ms.author, url: some avatarUrl(ms.author))
       var embfield = @[EmbedField(name: "Původní zpráva", value: "Empty")]
-      #echo m.member.get().user
-      
-      # messageReactionAdd bugged?
-      if m.content != "":
-        embfield[0].value = m.content
+
+      if ms.content != "":
+        embfield[0].value = ms.content
       embfield &= EmbedField(name: "Channel", value: $channel_obj[0].get())
       emb.fields = some embfield
       #var out_msg = ""
-      for at in m.attachments:
+      for at in ms.attachments:
         if at.content_type.isSome:
           if at.content_type.get() in ["image/jpeg", "image/png", "image/gif"] and emb.image.isNone:
             emb.image = some EmbedImage(url: at.url)
@@ -924,7 +925,6 @@ proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: b
           over_perms[user_id].allow = over_perms[user_id].allow - {permViewChannel}
           if over_perms[user_id].allow.len == 0 and over_perms[user_id].deny.len == 0:
           #  over_perms.del(user_id)
-          # TODO function doesn't seem to work
             await discord.api.deleteGuildChannelPermission(channel_to_del, user_id)
             return
 
