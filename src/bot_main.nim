@@ -7,6 +7,7 @@ import options
 import times
 import std/random
 import std/sequtils
+import std/strutils
 import std/sets
 import std/logging
 import std/os
@@ -27,6 +28,13 @@ var guild_ids: seq[string]
 
 let discord* = newDiscordClient(conf.discord.token)
 var cmd* = discord.newHandler()
+
+proc create_room_role(guild_id: string, name: string, category_id: string): Future[(Role, GuildChannel)] {.async.} =
+  var myrole = await discord.api.createGuildRole(guild_id, name, permissions = PermObj(allowed: {}, denied: {}))
+  discard await discord.api.editGuildRolePosition(guild_id, myrole.id, some 3)
+  let perm_over = @[Overwrite(id: myrole.id, kind: 0, allow: {permViewChannel}, deny: {})]
+  let new_chan = await discord.api.createGuildChannel(guild_id, name, 0, some category_id, some name, permission_overwrites = some perm_over)
+  return (myrole, new_chan)
 
 proc get_verified_role_id(guild_id: string): Future[string] {.async.} =
   var role = query.get_role_id_name(guild_id, conf.discord.verified_role)
@@ -455,6 +463,7 @@ cmd.addChat("help") do ():
             $$spawn-priv-threads <jmeno vlaken> <pocet>
             $$whois <id uzivatele>
             $$create-room-role <jmeno role/kanalu> <id kategorie> (jmeno bez mezer)
+            $$msg-to-room-role-react <id zpravy> <id kategorie>
             $$make-teacher <uzivatel>
 
             Příkazi nemají moc kontrol tak si dávejte pozor co píšete
@@ -643,11 +652,28 @@ cmd.addChat("create-room-role") do (name: string, category_id: string):
   let guild_id = msg.guild_id.get()
   if query.get_user_power_level(guild_id, msg.author.id) <= 3:
     return
-  var myrole = await discord.api.createGuildRole(guild_id, name, permissions = PermObj(allowed: {}, denied: {}))
-  discard await discord.api.editGuildRolePosition(guild_id, myrole.id, some 3)
-  let perm_over = @[Overwrite(id: myrole.id, kind: 0, allow: {permViewChannel}, deny: {})]
-  let new_chan = await discord.api.createGuildChannel(guild_id, name, 0, some category_id, some name, permission_overwrites = some perm_over)
-  discard await msg.reply("Vytvoren kanal " & new_chan.id & " roli " & myrole.id)
+  var mytup = await create_room_role(guild_id, name, category_id)
+  discard await msg.reply("Vytvoren kanal " & mytup[1].id & " roli " & mytup[0].id)
+
+cmd.addChat("msg-to-room-role-react") do (message_id: string, category_id: string):
+  if msg.guild_id.isNone:
+    return
+  let guild_id = msg.guild_id.get()
+  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
+    return
+  let room_id = msg.channel_id
+  var lines = (await discord.api.getChannelMessage(room_id, message_id)).content.splitLines()
+  for l in lines:
+    var spl = l.split('-')
+    if spl.len != 2:
+      continue
+    var role_room_name = spl[0]
+    var emoji = spl[1]
+    role_room_name = strutils.strip(role_room_name)
+    emoji = strutils.strip(emoji)
+    var therole = (await create_room_role(guild_id, role_room_name, category_id))[0]
+    if query.insert_role_reaction(guild_id, emoji, room_id, therole.id, message_id):
+      await discord.api.addMessageReaction(room_id, message_id, emoji)
 
 cmd.addChat("whois") do (user_id: string):
   if msg.guild_id.isNone:
