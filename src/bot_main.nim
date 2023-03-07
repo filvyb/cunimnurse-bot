@@ -31,7 +31,7 @@ var cmd* = discord.newHandler()
 
 proc create_room_role(guild_id: string, name: string, category_id: string): Future[(Role, GuildChannel)] {.async.} =
   var myrole = await discord.api.createGuildRole(guild_id, name, permissions = PermObj(allowed: {}, denied: {}))
-  discard await discord.api.editGuildRolePosition(guild_id, myrole.id, some 3)
+  discard await discord.api.editGuildRolePosition(guild_id, myrole.id, some 2)
   let perm_over = @[Overwrite(id: myrole.id, kind: 0, allow: {permViewChannel}, deny: {})]
   let new_chan = await discord.api.createGuildChannel(guild_id, name, 0, some category_id, some name, permission_overwrites = some perm_over)
   return (myrole, new_chan)
@@ -735,7 +735,8 @@ cmd.addChat("sync-emojis") do ():
 
       for e in emojis_to_del:
         await discord.api.deleteGuildEmoji(g, e)
-        info(fmt"Deleted {emojis_to_del.len} emojis from {g}")
+      info(fmt"Deleted {emojis_to_del.len} emojis from {g}")
+
       for e in guild_emojis:
         if e.id.get() in emojis_to_add:
           var image = await download_emoji(e.id.get(), e.animated.get())
@@ -797,7 +798,7 @@ proc guildMemberAdd(s: Shard, g: Guild, m: Member) {.event(discord).} =
   if query.get_user_verification_status(user_id) == 2:
     let ver_role = await get_verified_role_id(g.id)
     var roles = @[ver_role]
-    await discord.api.editGuildMember(ver_role, user_id, roles = some roles)
+    await discord.api.editGuildMember(g.id, user_id, roles = some roles)
 
 # Remove roles on leave
 proc guildMemberRemove(s: Shard, g: Guild, m: Member) {.event(discord).} =
@@ -1055,17 +1056,27 @@ proc channelUpdate(s: Shard, g: Guild, c: GuildChannel, o: Option[GuildChannel])
 # Handle bans
 proc guildBanAdd(s: Shard, g: Guild, u: User) {.event(discord).} =
   discard query.update_verified_status(u.id, 3)
+  var main_ban = await discord.api.getGuildBan(g.id, u.id)
+  var reason = "No reason given"
+  if main_ban.reason.isSome:
+    reason = main_ban.reason.get()
   for gid in guild_ids:
     if gid != g.id:
-      await discord.api.createGuildBan(g.id, u.id)
+      try:
+        await discord.api.createGuildBan(gid, u.id, reason = reason)
+      except CatchableError as e:
+        error(e.msg)
 
 proc guildBanRemove(s: Shard, g: Guild, u: User) {.event(discord).} =
-  discard query.update_verified_status(u.id, 2)
+  discard query.delete_user(u.id)
   for gid in guild_ids:
     if gid != g.id:
-      await discord.api.createGuildBan(g.id, u.id)
+      try:
+        await discord.api.removeGuildBan(gid, u.id)
+      except CatchableError as e:
+        error(e.msg)
 
-# Handling handling
+# Interaction handling
 proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
   let guild_id = i.guild_id
   let data = i.data.get()
