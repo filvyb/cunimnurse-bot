@@ -19,7 +19,7 @@ import config
 import db/queries as query
 import commands/verify
 import commands/mason
-import utils/get_emoji
+import utils/my_utils
 import utils/logging as clogger
 
 let conf = config.conf
@@ -662,18 +662,21 @@ cmd.addChat("msg-to-room-role-react") do (message_id: string, category_id: strin
   if query.get_user_power_level(guild_id, msg.author.id) <= 3:
     return
   let room_id = msg.channel_id
-  var lines = (await discord.api.getChannelMessage(room_id, message_id)).content.splitLines()
-  for l in lines:
-    var spl = l.split('-')
-    if spl.len != 2:
-      continue
-    var role_room_name = spl[0]
-    var emoji = spl[1]
-    role_room_name = strutils.strip(role_room_name)
-    emoji = strutils.strip(emoji)
-    var therole = (await create_room_role(guild_id, role_room_name, category_id))[0]
-    if query.insert_role_reaction(guild_id, emoji, room_id, therole.id, message_id):
-      await discord.api.addMessageReaction(room_id, message_id, emoji)
+  if room_id in conf.discord.reaction_channels:
+    var lines = (await discord.api.getChannelMessage(room_id, message_id)).content.splitLines()
+    for l in lines:
+      var spl = l.split('-')
+      if spl.len != 2:
+        continue
+      var role_room_name = spl[0]
+      var emoji = spl[1]
+      role_room_name = strutils.strip(role_room_name)
+      emoji = strutils.strip(emoji)
+      var therole = (await create_room_role(guild_id, role_room_name, category_id))[0]
+      if query.insert_role_reaction(guild_id, emoji, room_id, therole.id, message_id):
+        await discord.api.addMessageReaction(room_id, message_id, emoji)
+  else:
+    discard await msg.reply("Vyběr rolí reakcemi neni na tomto kanále povolen.")
 
 cmd.addChat("whois") do (user_id: string):
   if msg.guild_id.isNone:
@@ -713,32 +716,30 @@ cmd.addChat("sync-emojis") do ():
   let guild_id = msg.guild_id.get()
   if query.get_user_power_level(guild_id, msg.author.id) <= 3:
     return
+
   let guild_emojis = await discord.api.getGuildEmojis(guild_id)
-  var guild_emojis_ids: seq[string]
+  var guild_emojis_tb = initTable[string, string]()
   for e in guild_emojis:
-    guild_emojis_ids.add(e.id.get())
-  let guild_emojis_ids_set = toHashSet(guild_emojis_ids)
-  echo guild_emojis
+    guild_emojis_tb[e.name.get()] = e.id.get()
   
   for g in guild_ids:
     if g != guild_id:
       let g_emojis = await discord.api.getGuildEmojis(g)
-      var g_emojis_ids: seq[string]
+      var g_emojis_tb = initTable[string, string]()
       for e in g_emojis:
-        g_emojis_ids.add(e.id.get())
-      let g_emojis_ids_set = toHashSet(g_emojis_ids)
+        g_emojis_tb[e.name.get()] = e.id.get()
 
-      let emojis_to_del = g_emojis_ids_set - guild_emojis_ids_set
-      let emojis_to_add = guild_emojis_ids_set - g_emojis_ids_set
+      let emojis_to_del = g_emojis_tb - guild_emojis_tb
+      let emojis_to_add = guild_emojis_tb - g_emojis_tb
 
       var failed_sync = 0
 
-      for e in emojis_to_del:
+      for e in values(emojis_to_del):
         await discord.api.deleteGuildEmoji(g, e)
       info(fmt"Deleted {emojis_to_del.len} emojis from {g}")
 
       for e in guild_emojis:
-        if e.id.get() in emojis_to_add:
+        if e.name.get() in emojis_to_add:
           var image = await download_emoji(e.id.get(), e.animated.get())
           if image != "":
             var mime = "image/png"

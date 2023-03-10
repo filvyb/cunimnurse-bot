@@ -3,6 +3,8 @@ import std/base64
 import std/asyncdispatch
 import std/logging
 import std/strformat
+import std/tables
+import std/sets
 
 import ../utils/logging as clogger
 
@@ -25,3 +27,17 @@ proc download_emoji*(emoji_id: string, animated = false): Future[string] {.async
   except CatchableError as e:
     error(e.msg)
     return ""
+
+proc tableDiff*[A, B](table1, table2: Table[A, B]): Table[A, B] =
+  var diffTable = initTable[A, B]()
+  for key1, value1 in table1:
+    if not contains(table2, key1):
+      diffTable[key1] = value1
+
+  return diffTable
+
+proc `-`*[A, B](table1, table2: Table[A, B]): Table[A, B] {.inline.} =
+  return tableDiff(table1, table2)
+
+proc `+`*[A, B](table1, table2: Table[A, B]): Table[A, B] {.inline.} =
+  return merge(table1, table2)
