@@ -739,7 +739,9 @@ cmd.addChat("sync-emojis") do ():
       info(fmt"Deleted {emojis_to_del.len} emojis from {g}")
 
       for e in guild_emojis:
+        sleep(200)
         if e.name.get() in emojis_to_add:
+          sleep(300)
           var image = await download_emoji(e.id.get(), e.animated.get())
           if image != "":
             var mime = "image/png"
