@@ -19,6 +19,7 @@ import config
 import db/queries as query
 import commands/verify
 import commands/mason
+import commands/jokes
 import utils/my_utils
 import utils/logging as clogger
 
@@ -277,7 +278,7 @@ cmd.addSlash("flip") do ():
   await i.reply(sample(coin))
 
 cmd.addSlash("verify") do (login: string):
-  ## UCO
+  ## Zadej svoje UČO
   if i.channel_id.get() == conf.discord.verify_channel:
     var res = query.insert_user(i.member.get().user.id, login, 0)
     if res == false:
@@ -289,7 +290,7 @@ cmd.addSlash("verify") do (login: string):
     await i.reply("Špatný kanál")
 
 cmd.addSlash("resetverify") do ():
-  ## Pouzi pokud si pokazil verify
+  ## Použi pokud si pokazil verify
   let user_id = i.member.get().user.id
   if i.channel_id.get() == conf.discord.verify_channel:
     var user_stat = query.get_user_verification_status(user_id)
@@ -444,6 +445,16 @@ cmd.addSlash("search del") do (id: int):
     await i.reply("Odebráno")
   else:
     await i.reply("ID nenalezeno")
+
+cmd.addSlash("yomamma") do ():
+  ## Řekne vtip o tvojí mámě
+  var joke = await get_mom_joke()
+  await i.reply(joke)
+
+cmd.addSlash("dadjoke") do ():
+  ## Řekne dad joke
+  var joke = await get_dad_joke()
+  await i.reply(joke)
 
 # Admin and mod commands, done with $$
 cmd.addChat("help") do ():
@@ -724,6 +735,7 @@ cmd.addChat("sync-emojis") do ():
   
   for g in guild_ids:
     if g != guild_id:
+      sleep(100)
       let g_emojis = await discord.api.getGuildEmojis(g)
       var g_emojis_tb = initTable[string, string]()
       for e in g_emojis:
