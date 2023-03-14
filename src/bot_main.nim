@@ -1154,7 +1154,7 @@ proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
           var imgemb = EmbedImage(url: med_url)
           var msg_url = "https://discord.com/channels/" & guild_id & "/" & room_id & "/" & msg_med_ids[0]
           var desc = fmt"Tento meme se shoduje ze {dedupe_res[1]}% s jiným. Pokud tak není klikněte na ❎"
-          var emb = Embed(title: some "Repost", description: some desc, image: some imgemb)
+          var emb = Embed(title: some "Repost", description: some desc, image: some imgemb, footer: some EmbedFooter(text: msg_id))
           var sent_msg = await discord.api.sendMessage(room_id, content = msg_url, embeds = @[emb], message_reference = some MessageReference(channel_id: some room_id, message_id: some msg_id))
           await discord.api.addMessageReaction(room_id, sent_msg.id, "❎")
 
@@ -1167,5 +1167,20 @@ proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
   var ch_type = await discord.api.getChannel(room_id)
 
   if ch_type[0].isSome:
+    # Handle removal of media in dedupe channels
     if room_id in conf.discord.dedupe_channels:
       discard query.delete_media_message(guild_id, room_id, msg_id)
+
+      # Scan messages for repost embeds
+      let messages = await discord.api.getChannelMessages(room_id, after = msg_id)
+
+      for ms in messages:
+        if not ms.author.bot: continue
+        try:
+          if ms.embeds.len == 1:
+            let emb_msg_id = ms.embeds[0].footer.get().text
+            if emb_msg_id == msg_id:
+              await discord.api.deleteMessage(room_id, ms.id)
+              break
+        except: # Naughty
+          continue
