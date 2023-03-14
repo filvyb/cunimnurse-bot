@@ -221,6 +221,7 @@ proc initializeDB*() =
 ]#
 
 proc migrateDB*(scheme: int) =
+  var scheme = scheme
   if scheme < 2:
     db_conn.exec(sql"DROP TABLE IF EXISTS searching CASCADE")
     db_conn.exec(sql("""CREATE TABLE searching (
@@ -240,3 +241,9 @@ proc migrateDB*(scheme: int) =
     db_conn.exec(sql"CREATE INDEX sear_id1_id2_id4 ON searching (guild_id, channel_id, search_id)")
 
     db_conn.exec(sql"UPDATE scheme SET id = 2 WHERE id = ?", scheme)
+    scheme = scheme + 1
+  if scheme < 3:
+    db_conn.exec(sql"CREATE INDEX med_id1_id2 ON media_dedupe (guild_id, channel_id)")
+
+    db_conn.exec(sql"UPDATE scheme SET id = 3 WHERE id = ?", scheme)
+    scheme = scheme + 1

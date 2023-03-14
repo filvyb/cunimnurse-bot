@@ -3,6 +3,7 @@ token = "bot_token"
 verify_channel = "id"
 reaction_channels = ["id", "id2"]
 thread_react_channels = ["id", "id2"]
+dedupe_channels = ["id", "id2"]
 confession_channel = "id"
 verified_role = "role name"
 moderator_role = "role name"

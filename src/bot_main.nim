@@ -879,6 +879,8 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
         if reacts.len >= conf.discord.pin_vote_count:
           await discord.api.addChannelMessagePin(room_id, msg_id)
           await discord.api.deleteMessageReactionEmoji(room_id, msg_id, "📌")
+      return
+
     # Bookmarks
     if emoji_name == "🔖":
       var post_url = "https://discord.com/channels/" & guild_id & "/" & room_id & "/" & msg_id
@@ -910,19 +912,28 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
         embfield[0].value = ms.content
       embfield &= EmbedField(name: "Channel", value: $channel_obj[0].get())
       emb.fields = some embfield
-      #var out_msg = ""
       for at in ms.attachments:
         if at.content_type.isSome:
-          if at.content_type.get() in ["image/jpeg", "image/png", "image/gif"] and emb.image.isNone:
+          if at.content_type.get() in ["image/jpeg", "image/png", "image/gif", "image/webp"] and emb.image.isNone:
             emb.image = some EmbedImage(url: at.url)
-        #else:
-        #  out_msg = out_msg & at.url & '\n'
 
       discard await discord.api.sendMessage(
             user_dm.id,
             components = @[row],
             embeds = @[emb]
         )
+      return
+
+    # Repost canceling
+    if emoji_name == "❎" and room_id in conf.discord.dedupe_channels:
+      var reacts = await discord.api.getMessageReactions(room_id, msg_id, "❎")
+      if reacts.len >= conf.discord.pin_vote_count:
+        var ms = m
+        if not exists:
+          ms = await discord.api.getChannelMessage(room_id, msg_id)
+        if not ms.author.bot: return
+        await discord.api.deleteMessage(room_id, msg_id)
+      return
 
   # Changed order so that people can pin and bookmark in rocnik threads
   if room_id in conf.discord.thread_react_channels:
@@ -1092,7 +1103,7 @@ proc guildBanRemove(s: Shard, g: Guild, u: User) {.event(discord).} =
         error(e.msg)
 
 # Interaction handling
-proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
+proc interactionCreate(s: Shard, i: Interaction) {.event(discord).} =
   let guild_id = i.guild_id
   let data = i.data.get()
   # Command handling
@@ -1104,17 +1115,19 @@ proc interactionCreate (s: Shard, i: Interaction) {.event(discord).} =
   if data.custom_id == "btnBookmarkDel":
     await discord.api.deleteMessage(i.channel_id.get(), i.message.get().id)
 
-proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
+proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
   if msg.author.bot: return
 
   discard await cmd.handleMessage("$$", s, msg)
 
   let author_id = msg.author.id
   let content = msg.content
+  let room_id = msg.channel_id
+  let msg_id = msg.id
   var guild_id = ""
   if msg.guild_id.isSome:
     guild_id = msg.guild_id.get()
-  var ch_type = await discord.api.getChannel(msg.channel_id)
+  var ch_type = await discord.api.getChannel(room_id)
 
   # Handle DMs
   if ch_type[1].isSome:
@@ -1126,3 +1139,33 @@ proc messageCreate (s: Shard, msg: Message) {.event(discord).} =
         let ver_role = await get_verified_role_id(g)
         await discord.api.addGuildMemberRole(g, author_id, ver_role)
       discard await msg.reply("Vítej na našem serveru")
+
+  if ch_type[0].isSome:
+    if room_id in conf.discord.dedupe_channels:
+      for a in msg.attachments:
+        var dedupe_res = await dedupe_media(guild_id, room_id, msg_id, a)
+        if dedupe_res[0] == true:
+          var msg_med_ids = dedupe_res[2].split("|")
+          var flagged_msg = await discord.api.getChannelMessage(room_id, msg_med_ids[0])
+          var med_url = ""
+          for f in flagged_msg.attachments:
+            if f.url.rfind(msg_med_ids[1]) >= 0:
+              med_url = f.url
+          var imgemb = EmbedImage(url: med_url)
+          var msg_url = "https://discord.com/channels/" & guild_id & "/" & room_id & "/" & msg_med_ids[0]
+          var desc = fmt"Tento meme se shoduje ze {dedupe_res[1]}% s jiným. Pokud tak není klikněte na ❎"
+          var emb = Embed(title: some "Repost", description: some desc, image: some imgemb)
+          var sent_msg = await discord.api.sendMessage(room_id, content = msg_url, embeds = @[emb], message_reference = some MessageReference(channel_id: some room_id, message_id: some msg_id))
+          await discord.api.addMessageReaction(room_id, sent_msg.id, "❎")
+
+proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
+  let room_id = m.channel_id
+  let msg_id = m.id
+  var guild_id = ""
+  if m.guild_id.isSome:
+    guild_id = m.guild_id.get()
+  var ch_type = await discord.api.getChannel(room_id)
+
+  if ch_type[0].isSome:
+    if room_id in conf.discord.dedupe_channels:
+      discard query.delete_media_message(guild_id, room_id, msg_id)

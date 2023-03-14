@@ -513,7 +513,7 @@ proc delete_chan_reaction*(guild_id: string, emoji_name: string, channel_id: str
     error(e.msg)
     return false
 
-proc delete_chan_emoji_reaction*(guild_id: string, emoji_name: string, channel_id: string, message_id: string): bool =
+proc delete_chan_emoji_reaction*(guild_id, emoji_name, channel_id, message_id: string): bool =
   try:
     db.exec(sql"DELETE FROM react2chan WHERE emoji_name = ? AND channel_id = ? AND message_id = ? AND guild_id = ?",
         emoji_name, channel_id, message_id, guild_id)
@@ -522,7 +522,7 @@ proc delete_chan_emoji_reaction*(guild_id: string, emoji_name: string, channel_i
     error(e.msg)
     return false
 
-proc delete_chan_react_message*(guild_id: string, channel_id: string, message_id: string): bool =
+proc delete_chan_react_message*(guild_id, channel_id, message_id: string): bool =
   try:
     db.exec(sql"DELETE FROM react2chan WHERE channel_id = ? AND message_id = ? AND guild_id = ?",
         channel_id, message_id, guild_id)
@@ -532,7 +532,7 @@ proc delete_chan_react_message*(guild_id: string, channel_id: string, message_id
     return false
 
 # Queries for searches
-proc insert_search*(guild_id: string, channel_id: string, user_id: string, search_id: int, search: string): bool =
+proc insert_search*(guild_id, channel_id, user_id: string, search_id: int, search: string): bool =
   try:
     db.exec(sql"INSERT INTO searching (guild_id, channel_id, user_id, search_id, search) VALUES (?, ?, ?, ?, ?)",
         guild_id, channel_id, user_id, search_id, search)
@@ -541,7 +541,7 @@ proc insert_search*(guild_id: string, channel_id: string, user_id: string, searc
     error(e.msg)
     return false
 
-proc get_channel_searches*(guild_id: string, channel_id: string): Option[seq[Row]] =
+proc get_channel_searches*(guild_id, channel_id: string): Option[seq[Row]] =
   try:
     var res = db.getAllRows(sql"SELECT user_id, search_id, search FROM searching WHERE guild_id = ? AND channel_id = ?",
         guild_id, channel_id)
@@ -552,7 +552,7 @@ proc get_channel_searches*(guild_id: string, channel_id: string): Option[seq[Row
     error(e.msg)
     return none(seq[Row])
 
-proc get_last_channel_search_id*(guild_id: string, channel_id: string): int =
+proc get_last_channel_search_id*(guild_id, channel_id: string): int =
   try:
     var res = db.getValue(sql"SELECT search_id FROM searching WHERE guild_id = ? AND channel_id = ? GROUP BY search_id ORDER BY search_id DESC",
         guild_id, channel_id)
@@ -563,7 +563,7 @@ proc get_last_channel_search_id*(guild_id: string, channel_id: string): int =
     error(e.msg)
     return -1
 
-proc get_search_id_user*(guild_id: string, channel_id: string, search_id: int): string =
+proc get_search_id_user*(guild_id, channel_id: string, search_id: int): string =
   try:
     var res = db.getValue(sql"SELECT search_id FROM searching WHERE guild_id = ? AND channel_id = ? AND search_id = ?",
         guild_id, channel_id, search_id)
@@ -572,10 +572,39 @@ proc get_search_id_user*(guild_id: string, channel_id: string, search_id: int): 
     error(e.msg)
     return ""
 
-proc delete_search*(guild_id: string, channel_id: string, search_id: int): bool =
+proc delete_search*(guild_id, channel_id: string, search_id: int): bool =
   try:
     db.exec(sql"DELETE FROM searching WHERE guild_id = ? AND channel_id = ? AND search_id = ?",
         guild_id, channel_id, search_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+# Queries for media dedupe
+proc insert_media*(guild_id, channel_id, message_id, media_id, hash: string): bool = 
+  try:
+    db.exec(sql"INSERT INTO media_dedupe (guild_id, channel_id, message_id, media_id, hash) VALUES (?, ?, ?, ?, ?)",
+        guild_id, channel_id, message_id, media_id, hash)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc get_all_channel_media*(guild_id, channel_id: string): Option[seq[Row]] =
+  try:
+    var res = db.getAllRows(sql"SELECT message_id, media_id, hash FROM media_dedupe WHERE guild_id = ? AND channel_id = ?", guild_id, channel_id)
+    if res.len == 0:
+      return none(seq[Row])
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[Row])
+
+proc delete_media_message*(guild_id, channel_id, message_id: string): bool =
+  try:
+    db.exec(sql"DELETE FROM media_dedupe WHERE guild_id = ? AND channel_id = ? AND message_id = ?",
+        guild_id, channel_id, message_id)
     return true
   except DbError as e:
     error(e.msg)

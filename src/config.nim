@@ -6,10 +6,10 @@ import std/unicode
 type
   DiscordConf* = object of RootObj
     token*: string
-    #guild_id*: string
     verify_channel*: string
     reaction_channels*: seq[string]
     thread_react_channels*: seq[string]
+    dedupe_channels*: seq[string]
     confession_channel*: string
     verified_role*: string
     moderator_role*: string
@@ -23,7 +23,6 @@ type
     user*: string
     password*: string
     dbname*: string
-    #slave*: bool
   EmailConf* = object of RootObj
     verify_domain*: string
     address*: string
@@ -59,7 +58,6 @@ proc initConfig(): Config =
     var d = x["discord"]
     result.discord = DiscordConf()
     result.discord.token = d["token"].getStr()
-    #result.discord.guild_id = d["guild_id"].getStr()
     result.discord.verify_channel = d["verify_channel"].getStr()
     result.discord.confession_channel = d["confession_channel"].getStr()
     result.discord.verified_role = d["verified_role"].getStr().toLower()
@@ -77,6 +75,11 @@ proc initConfig(): Config =
     for x in tmp2:
       tmpseq2.add(x.getStr())
     result.discord.thread_react_channels = tmpseq2
+    var tmp3 = d["dedupe_channels"].getElems()
+    var tmpseq3: seq[string]
+    for x in tmp3:
+      tmpseq3.add(x.getStr())
+    result.discord.dedupe_channels = tmpseq3
     result.discord.pin_vote_count = d["pin_vote_count"].getInt()
 
     var db = x["database"]
@@ -86,7 +89,6 @@ proc initConfig(): Config =
     result.database.user = db["user"].getStr()
     result.database.password = db["password"].getStr()
     result.database.dbname = db["dbname"].getStr()
-    #result.database.slave = db["slave"].getBool()
 
     var e = x["email"]
     result.email = EmailConf()
