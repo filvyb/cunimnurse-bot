@@ -268,7 +268,7 @@ cmd.addSlash("confess") do (confession: string):
       content= some rep)
   else:
     await i.reply("Přiznej se v DMs kktko")
-    sleep(1400)
+    await sleepAsync(1400)
     await discord.api.deleteInteractionResponse(i.application_id, i.token, "@original")
 
 cmd.addSlash("flip") do ():
@@ -338,7 +338,7 @@ cmd.addSlash("mason") do (numbers: int):
     is_nsfw = chan[0].get().nsfw
 
   await i.reply("...")
-  var num_result = parse_the_numbers(numbers)
+  var num_result = await parse_the_numbers(numbers)
   if num_result[0].isNone:
     var rep = "Mason tyhle čísla nezná"
     discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
@@ -648,10 +648,10 @@ cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
     for p in 1..10:
       var full_thread_name = thread_name & " " & $threads_done
       msg_text = msg_text & full_thread_name & " - " & emojis[p - 1] & '\n'
-      sleep(250)
+      await sleepAsync(250)
       react_msg = await discord.api.editMessage(room_id, react_msg.id, msg_text)
       var thread_obj = await discord.api.startThreadWithoutMessage(room_id, full_thread_name, 10080, some ctGuildPrivateThread, some false)
-      sleep(150)
+      await sleepAsync(150)
       await set_reaction2thread(msg, emojis[p - 1], thread_obj.id, react_msg.id)
       if threads_done >= thread_number:
         break
@@ -735,7 +735,7 @@ cmd.addChat("sync-emojis") do ():
   
   for g in guild_ids:
     if g != guild_id:
-      sleep(100)
+      await sleepAsync(100)
       let g_emojis = await discord.api.getGuildEmojis(g)
       var g_emojis_tb = initTable[string, string]()
       for e in g_emojis:
@@ -751,9 +751,9 @@ cmd.addChat("sync-emojis") do ():
       info(fmt"Deleted {emojis_to_del.len} emojis from {g}")
 
       for e in guild_emojis:
-        sleep(200)
+        await sleepAsync(200)
         if e.name.get() in emojis_to_add:
-          sleep(300)
+          await sleepAsync(300)
           var image = await download_emoji(e.id.get(), e.animated.get())
           if image != "":
             var mime = "image/png"

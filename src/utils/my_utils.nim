@@ -11,6 +11,7 @@ import std/strformat
 import std/tables
 import std/sets
 import std/strutils
+import std/osproc
 import options
 
 import ../db/queries
@@ -54,12 +55,41 @@ proc dedupe_media*(guild_id, channel_id, message_id: string, attach: Attachment)
   var file_path: string
 
   if attach.content_type.isSome:
-    if attach.content_type.get() in ["image/jpeg", "image/png", "image/webp", "image/gif"]:
+    let ext = attach.url.rsplit(".", 1)[1]
+    file_path = "/tmp/" & attach.id & "." & ext
+    if attach.content_type.get() in ["image/jpeg", "image/png", "image/webp"]:
       try:
-        let ext = attach.url.rsplit(".", 1)[1]
-        file_path = "/tmp/" & attach.id & ext
         var client = newAsyncHttpClient()
         await client.downloadFile(attach.url, file_path)
+
+      except CatchableError as e:
+        error(e.msg)
+        return (false, 0, "")
+    if attach.content_type.get() in ["video/mp4", "video/ogg", "video/webm", "image/gif"]:
+      try:
+        var client = newAsyncHttpClient()
+        await client.downloadFile(attach.url, file_path)
+
+
+        var ffmpeg_out = execCmdEx(fmt"ffmpeg -i {file_path} -vf 'blackdetect=d=0.05:pix_th=0.67' -an -f null - 2>&1 | grep blackdetect")
+
+        var cut_time = ""
+
+        if ffmpeg_out[1] == 0:
+          var ffmpeg_out_split = ffmpeg_out[0].split({'\n', '\r'})
+          
+          if ffmpeg_out_split.len != 1:
+            var start_time = ffmpeg_out_split[1].splitWhitespace()[3].split({':'})[1]
+            if start_time == "0":
+              cut_time &= "-ss "
+              cut_time &= ffmpeg_out_split[1].splitWhitespace()[4].split({':'})[1] & " "
+
+        var ffmpeg_thumb_out = execCmdEx(fmt"ffmpeg -i {file_path} {cut_time}-frames:v 1 /tmp/{attach.id}.png -y")
+
+        if ffmpeg_thumb_out[1] != 0:
+          return (false, 0, "")
+
+        file_path = "/tmp/" & attach.id & ".png"
 
       except CatchableError as e:
         error(e.msg)

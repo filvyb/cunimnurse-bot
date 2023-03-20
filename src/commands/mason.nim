@@ -2,12 +2,13 @@ import std/osproc
 import std/json
 import options
 import std/logging
+import asyncdispatch
 
 import ../config
 import ../utils/logging as clogger
 
 
-proc parse_the_numbers*(numbers: int): (Option[JsonNode], Option[string]) =
+proc parse_the_numbers*(numbers: int): Future[(Option[JsonNode], Option[string])] {.async.} =
   var browser_out = execCmdEx("python3 " & conf.utils.url_fetch_script & " https://nhentai.net/api/gallery/" & $numbers)
 
   if browser_out[1] != 0:

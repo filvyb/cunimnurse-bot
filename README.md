@@ -9,12 +9,15 @@ Discord bot for 1LFCUNI written in Nim
 - Syncs bans between servers
 - Vote to add message to pins
 - Bookmarks
+- Media deduping
 
 ## Usage
 ### Prerequisites:
 * Postgresql (tested on 15, but should run on 10+)
 * [Nim Lang](https://nim-lang.org/install.html) 1.6.10 or higher (should work with lower versions but I'm not testing it)
 * OpenSSL
+* FFmpeg
+* grep
 * Optional: Python3 with [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver)
 
 ### Build or install
