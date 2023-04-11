@@ -14,6 +14,7 @@ Discord bot for 1LFCUNI written in Nim
 ## Usage
 ### Prerequisites:
 * Postgresql (tested on 15, but should run on 10+)
+* [pgvector](https://github.com/pgvector/pgvector)
 * [Nim Lang](https://nim-lang.org/install.html) 1.6.10 or higher (should work with lower versions but I'm not testing it)
 * OpenSSL
 * FFmpeg

@@ -1,7 +1,6 @@
 from dimscord import Attachment
 import imageman
 import dhash
-import bigints
 
 import std/httpclient
 import std/base64
@@ -57,7 +56,7 @@ proc dedupe_media*(guild_id, channel_id, message_id: string, attach: Attachment)
   if attach.content_type.isSome:
     let ext = attach.url.rsplit(".", 1)[1]
     file_path = "/tmp/" & attach.id & "." & ext
-    if attach.content_type.get() in ["image/jpeg", "image/png", "image/webp"]:
+    if attach.content_type.get() in ["image/jpeg", "image/png"]:
       try:
         var client = newAsyncHttpClient()
         await client.downloadFile(attach.url, file_path)
@@ -65,7 +64,7 @@ proc dedupe_media*(guild_id, channel_id, message_id: string, attach: Attachment)
       except CatchableError as e:
         error(e.msg)
         return (false, 0, "")
-    if attach.content_type.get() in ["video/mp4", "video/ogg", "video/webm", "image/gif"]:
+    if attach.content_type.get() in ["video/mp4", "video/ogg", "video/webm", "image/gif", "image/webp"]:
       try:
         var client = newAsyncHttpClient()
         await client.downloadFile(attach.url, file_path)
@@ -97,20 +96,20 @@ proc dedupe_media*(guild_id, channel_id, message_id: string, attach: Attachment)
   else:
     return (false, 0, "")
 
-  let hash = dhash_int(get_img(file_path), 10)
-  discard insert_media(guild_id, channel_id, message_id, attach.id, toString(hash, 16))
-  let channel_media = get_all_channel_media(guild_id, channel_id)
+  let grays = get_grays(file_path, 16, 16)
+  let query_res = get_media_distance(guild_id, channel_id, grays)
 
-  var hamming_min = 128
-  var duplicate_med = ""
-  for med in channel_media.get():
-    if attach.id == med[1]:
-      continue
-    var hamming = get_num_bits_different(hash, initBigInt(med[2], 16))
-    if hamming < hamming_min:
-      duplicate_med = med[0] & "|" & med[1]
-      hamming_min = hamming
+  discard insert_media(guild_id, channel_id, message_id, attach.id, grays)
 
-  if hamming_min <= 14:
-    return (true, int((1 - hamming_min / 128) * 100), duplicate_med)
+  if query_res.isNone:
+    return (false, 0, "")
+
+
+  var duplicate_med = query_res.get()[0] & "|" & query_res.get()[1]
+
+  let distance = parseFloat(query_res.get()[2])
+
+  # 800 is randomly selected, but in my testing should be about 25% difference
+  if distance < 800:
+    return (true, int((1 - distance / 3200) * 100), duplicate_med)
   return (false, 0, "")

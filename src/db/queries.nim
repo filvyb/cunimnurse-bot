@@ -582,24 +582,38 @@ proc delete_search*(guild_id, channel_id: string, search_id: int): bool =
     return false
 
 # Queries for media dedupe
-proc insert_media*(guild_id, channel_id, message_id, media_id, hash: string): bool = 
+proc insert_media*(guild_id, channel_id, message_id, media_id: string, grays: seq[uint8]): bool = 
+  var invec = "[" & grays.join(",") & "]"
   try:
-    db.exec(sql"INSERT INTO media_dedupe (guild_id, channel_id, message_id, media_id, hash) VALUES (?, ?, ?, ?, ?)",
-        guild_id, channel_id, message_id, media_id, hash)
+    db.exec(sql"INSERT INTO media_dedupe (guild_id, channel_id, message_id, media_id, grays) VALUES (?, ?, ?, ?, ?)",
+        guild_id, channel_id, message_id, media_id, invec)
     return true
   except DbError as e:
     error(e.msg)
     return false
 
-proc get_all_channel_media*(guild_id, channel_id: string): Option[seq[Row]] =
+proc get_all_channel_media*(guild_id, channel_id: string): Option[seq[Row]] {.deprecated.} =
   try:
-    var res = db.getAllRows(sql"SELECT message_id, media_id, hash FROM media_dedupe WHERE guild_id = ? AND channel_id = ?", guild_id, channel_id)
+    var res = db.getAllRows(sql"SELECT message_id, media_id, grays FROM media_dedupe WHERE guild_id = ? AND channel_id = ?", guild_id, channel_id)
     if res.len == 0:
       return none(seq[Row])
     return some(res)
   except DbError as e:
     error(e.msg)
     return none(seq[Row])
+
+proc get_media_distance*(guild_id, channel_id: string, grays: seq[uint8]): Option[array[3,string]] =
+  var invec = "[" & grays.join(",") & "]"
+  try:
+    var res = db.getRow(sql"SELECT message_id, media_id, grays <-> ? AS distance FROM media_dedupe WHERE guild_id = ? AND channel_id = ? ORDER BY distance LIMIT 1",
+        invec, guild_id, channel_id)
+    if res[0] == "":
+      return none(array[3, string])
+    var ret = [res[0], res[1], res[2]]
+    return some(ret)
+  except DbError as e:
+    error(e.msg)
+    return none(array[3, string])
 
 proc delete_media_message*(guild_id, channel_id, message_id: string): bool =
   try:

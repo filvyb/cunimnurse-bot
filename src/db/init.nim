@@ -8,11 +8,6 @@ let conf = config.conf.database
 let db_conn* = open("", conf.user, conf.password, fmt"host={conf.host} port={conf.port} dbname={conf.dbname}")
 
 proc initializeDB*() =
-  db_conn.exec(sql"DROP TABLE IF EXISTS scheme CASCADE")
-  db_conn.exec(sql("""CREATE TABLE scheme (
-                 id INTEGER UNIQUE)"""))
-  db_conn.exec(sql"INSERT INTO scheme(id) VALUES(1)")
-
   db_conn.exec(sql"DROP TABLE IF EXISTS verification CASCADE")
   # Status
   # 0 = unverified, 1 = pending, 2 = verified, 3 = banned, 4 = jailed
@@ -200,50 +195,52 @@ proc initializeDB*() =
   db_conn.exec(sql"CREATE INDEX med_id3_hash ON media_dedupe (media_id, hash)")
   db_conn.exec(sql"CREATE INDEX med_id1_id2_hash ON media_dedupe (guild_id, channel_id, hash)")
   db_conn.exec(sql"CREATE INDEX med_id2_id3 ON media_dedupe (channel_id, message_id)")
-  #db_conn.exec(sql"CREATE INDEX med_id2_id4 ON media_dedupe (channel_id, media_id)")
   db_conn.exec(sql"CREATE INDEX med_id1_id2_id3_id4 ON media_dedupe (guild_id, channel_id, message_id, media_id)")
 
-#[
-  if conf.slave:
-    db_conn.exec(sql("""CREATE FUNCTION do_not_change()
-                          RETURNS TRIGGER
-                        AS
-                        $$
-                        BEGIN
-                          RAISE EXCEPTION 'This tables is set as slave table.';
-                        END;
-                        $$
-                        language plpgsql"""))
-
-    db_conn.exec(sql("""CREATE TRIGGER no_change_trigger
-                          BEFORE INSERT OR UPDATE OR DELETE ON "verification"
-                          EXECUTE PROCEDURE do_not_change()"""))
-]#
+  db_conn.exec(sql"DROP TABLE IF EXISTS scheme CASCADE")
+  db_conn.exec(sql("""CREATE TABLE scheme (
+                 id INTEGER UNIQUE)"""))
+  db_conn.exec(sql"INSERT INTO scheme(id) VALUES(1)")
 
 proc migrateDB*(scheme: int) =
   var scheme = scheme
   if scheme < 2:
-    db_conn.exec(sql"DROP TABLE IF EXISTS searching CASCADE")
-    db_conn.exec(sql("""CREATE TABLE searching (
-                  guild_id TEXT,
-                  channel_id TEXT,
-                  user_id TEXT references verification(id) ON DELETE CASCADE,
-                  search_id INTEGER NOT NULL CHECK(search_id >= 0),
-                  search TEXT NOT NULL,
-                  FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE,
-                  UNIQUE(guild_id, channel_id, search_id)
-                  )"""))
+    try:
+      db_conn.exec(sql"DROP TABLE IF EXISTS searching CASCADE")
+      db_conn.exec(sql("""CREATE TABLE searching (
+                    guild_id TEXT,
+                    channel_id TEXT,
+                    user_id TEXT references verification(id) ON DELETE CASCADE,
+                    search_id INTEGER NOT NULL CHECK(search_id >= 0),
+                    search TEXT NOT NULL,
+                    FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE,
+                    UNIQUE(guild_id, channel_id, search_id)
+                    )"""))
 
-    db_conn.exec(sql"CREATE INDEX sear_id1 ON searching (guild_id)")
-    db_conn.exec(sql"CREATE INDEX sear_id2 ON searching (channel_id)")
-    db_conn.exec(sql"CREATE INDEX sear_id3 ON searching (user_id)")
-    db_conn.exec(sql"CREATE INDEX sear_id1_id2 ON searching (guild_id, channel_id)")
-    db_conn.exec(sql"CREATE INDEX sear_id1_id2_id4 ON searching (guild_id, channel_id, search_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id1 ON searching (guild_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id2 ON searching (channel_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id3 ON searching (user_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id1_id2 ON searching (guild_id, channel_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id1_id2_id4 ON searching (guild_id, channel_id, search_id)")
 
-    db_conn.exec(sql"UPDATE scheme SET id = 2 WHERE id = ?", scheme)
-    scheme = scheme + 1
+      db_conn.exec(sql"UPDATE scheme SET id = 2 WHERE id = ?", scheme)
+      scheme = scheme + 1
+    except DbError:
+      quit(99)
   if scheme < 3:
-    db_conn.exec(sql"CREATE INDEX med_id1_id2 ON media_dedupe (guild_id, channel_id)")
+    try:
+      db_conn.exec(sql"CREATE INDEX med_id1_id2 ON media_dedupe (guild_id, channel_id)")
 
-    db_conn.exec(sql"UPDATE scheme SET id = 3 WHERE id = ?", scheme)
-    scheme = scheme + 1
+      db_conn.exec(sql"UPDATE scheme SET id = 3 WHERE id = ?", scheme)
+      scheme = scheme + 1
+    except DbError:
+      quit(99)
+  if scheme < 4:
+    try:
+      db_conn.exec(sql"ALTER TABLE media_dedupe DROP COLUMN hash CASCADE")
+      db_conn.exec(sql"ALTER TABLE media_dedupe ADD COLUMN grays vector(256)")
+
+      db_conn.exec(sql"UPDATE scheme SET id = 4 WHERE id = ?", scheme)
+      scheme = scheme + 1
+    except DbError:
+      quit(99)
