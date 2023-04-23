@@ -650,6 +650,7 @@ cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
       msg_text = msg_text & full_thread_name & " - " & emojis[p - 1] & '\n'
       await sleepAsync(250)
       react_msg = await discord.api.editMessage(room_id, react_msg.id, msg_text)
+      await sleepAsync(100)
       var thread_obj = await discord.api.startThreadWithoutMessage(room_id, full_thread_name, 10080, some ctGuildPrivateThread, some false)
       await sleepAsync(150)
       await set_reaction2thread(msg, emojis[p - 1], thread_obj.id, react_msg.id)
@@ -735,7 +736,7 @@ cmd.addChat("sync-emojis") do ():
   
   for g in guild_ids:
     if g != guild_id:
-      await sleepAsync(100)
+      await sleepAsync(120)
       let g_emojis = await discord.api.getGuildEmojis(g)
       var g_emojis_tb = initTable[string, string]()
       for e in g_emojis:
@@ -748,6 +749,7 @@ cmd.addChat("sync-emojis") do ():
 
       for e in values(emojis_to_del):
         await discord.api.deleteGuildEmoji(g, e)
+        await sleepAsync(100)
       info(fmt"Deleted {emojis_to_del.len} emojis from {g}")
 
       for e in guild_emojis:
@@ -1184,3 +1186,11 @@ proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
               break
         except: # Naughty
           continue
+    
+    if room_id in conf.discord.thread_react_channels:
+      var threads = query.get_threads_by_message(guild_id, room_id, msg_id)
+      if threads.isNone:
+        return
+      for thread_id in threads.get():
+        await discord.api.deleteChannel(thread_id)
+        await sleepAsync(100)

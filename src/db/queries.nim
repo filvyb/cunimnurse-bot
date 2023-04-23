@@ -355,6 +355,22 @@ proc get_reaction_thread*(guild_id: string, emoji_name: string, channel_id: stri
     error(e.msg)
     return ""
 
+proc get_threads_by_message*(guild_id: string, channel_id: string, message_id: string): Option[seq[string]] =
+  try:
+    var tmp = db.getAllRows(sql"SELECT thread_id FROM react2thread WHERE channel_id = ? AND guild_id = ? AND message_id = ?",
+        channel_id, guild_id, message_id)
+    if tmp.len == 0:
+      return none(seq[string])
+    
+    var res: seq[string]
+    for x in tmp:
+      res.add(x[0])
+
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[string])
+
 proc delete_reaction2thread_message*(guild_id: string, channel_id: string, message_id: string): bool =
   try:
     db.exec(sql"DELETE FROM react2thread WHERE channel_id = ? AND message_id = ? AND guild_id = ?",
