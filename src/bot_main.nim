@@ -639,7 +639,7 @@ cmd.addChat("spawn-priv-threads") do (thread_name: string, thread_number: int):
     return
   
   for i in 1..msg_count:
-    var msg_text = "Vyber is okruh\n"
+    var msg_text = "Vyber is kruh\n"
     #if msg_count != 1:
     #  msg_text = "-\n"
     let emojis = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"]
