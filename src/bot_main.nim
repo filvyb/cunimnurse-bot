@@ -476,6 +476,7 @@ cmd.addChat("help") do ():
             $$create-room-role <jmeno role/kanalu> <id kategorie> (jmeno bez mezer)
             $$msg-to-room-role-react <id zpravy> <id kategorie>
             $$make-teacher <uzivatel>
+            $$get-rooms-in-config
 
             Příkazi nemají moc kontrol tak si dávejte pozor co píšete
             """
@@ -771,6 +772,45 @@ cmd.addChat("sync-emojis") do ():
       info(fmt"Added {emojis_to_add.len - failed_sync} emojis from {guild_id} to {g}")
   discard await msg.reply("Emoji sync finished")
 
+cmd.addChat("get-rooms-in-config") do ():
+  if msg.guild_id.isNone:
+    return
+  let guild_id = msg.guild_id.get()
+  if query.get_user_power_level(guild_id, msg.author.id) <= 2:
+    return
+
+  var final_str = "Reaction channels\n"
+
+  for i in conf.discord.reaction_channels:
+    var chan = (await discord.api.getChannel(i))[0].get()
+    var guild = await discord.api.getGuild(chan.guild_id)
+    
+    final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
+    final_str &= '\n'
+
+  final_str &= "Thread react channels\n"
+  await sleepAsync(100)
+
+  for i in conf.discord.thread_react_channels:
+    var chan = (await discord.api.getChannel(i))[0].get()
+    var guild = await discord.api.getGuild(chan.guild_id)
+    
+    final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
+    final_str &= '\n'
+
+  final_str &= "Dedupe channels\n"
+  await sleepAsync(100)
+
+  for i in conf.discord.dedupe_channels:
+    var chan = (await discord.api.getChannel(i))[0].get()
+    var guild = await discord.api.getGuild(chan.guild_id)
+    
+    final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
+    final_str &= '\n'
+
+  discard await msg.reply(final_str)
+
+
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   for g in r.guilds:
     if g.unavailable:
@@ -995,28 +1035,25 @@ proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: b
       await discord.api.removeThreadMember(thread_to_del, user_id)
 
 
-# Remove react 2 roles/threads
-proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
-  #if m.author.bot: return
-
-  let room_id = m.channel_id
-  let msg_id = m.id
-  var guild_id = ""
-  if m.guild_id.isSome:
-    guild_id = m.guild_id.get()
-
-  if room_id in conf.discord.reaction_channels:
-    discard query.delete_reaction_message(guild_id, room_id, msg_id)
-    discard query.delete_chan_react_message(guild_id, room_id, msg_id)
-  if room_id in conf.discord.thread_react_channels:
-    discard query.delete_reaction2thread_message(guild_id, room_id, msg_id)
-
 # Delete reaction to enter threads
 proc threadDelete(s: Shard, g: Guild, c: GuildChannel, exists: bool) {.event(discord).} =
   let thread_id = c.id
   if c.kind == ctGuildPrivateThread:
+    if c.parent_id.isNone:
+      return
+    
+    let thread_q = query.get_react_msg_by_thread(g.id, c.parent_id.get(), thread_id)
+    if thread_q.isNone:
+      return
+    try:
+      await discord.api.deleteMessageReactionEmoji(c.parent_id.get(), thread_q.get()[0], thread_q.get()[1])
+      await sleepAsync(50)
+    except CatchableError as e:
+      error(e.msg)
     if query.delete_reaction_thread(g.id, thread_id):
       info(fmt"Reactions to thread {thread_id} deleted from DB")
+      return
+
 
 # Handle on fly role assignments
 proc guildMemberUpdate(s: Shard; g: Guild; m: Member; o: Option[Member]) {.event(discord).} =
@@ -1186,11 +1223,17 @@ proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
               break
         except: # Naughty
           continue
+
+    # Remove react 2 roles/threads
+    if room_id in conf.discord.reaction_channels:
+      discard query.delete_reaction_message(guild_id, room_id, msg_id)
+      discard query.delete_chan_react_message(guild_id, room_id, msg_id)
     
     if room_id in conf.discord.thread_react_channels:
       var threads = query.get_threads_by_message(guild_id, room_id, msg_id)
       if threads.isNone:
         return
+      discard query.delete_reaction2thread_message(guild_id, room_id, msg_id)
       for thread_id in threads.get():
         await discord.api.deleteChannel(thread_id)
         await sleepAsync(100)

@@ -346,7 +346,7 @@ proc insert_thread_reaction*(guild_id: string, emoji_name: string, channel_id: s
     error(e.msg)
     return false
 
-proc get_reaction_thread*(guild_id: string, emoji_name: string, channel_id: string, message_id: string): string =
+proc get_reaction_thread*(guild_id, emoji_name, channel_id, message_id: string): string =
   try:
     var res = db.getValue(sql"SELECT thread_id FROM react2thread WHERE emoji_name = ? AND channel_id = ? AND message_id = ? AND guild_id = ?",
         emoji_name, channel_id, message_id, guild_id)
@@ -355,7 +355,18 @@ proc get_reaction_thread*(guild_id: string, emoji_name: string, channel_id: stri
     error(e.msg)
     return ""
 
-proc get_threads_by_message*(guild_id: string, channel_id: string, message_id: string): Option[seq[string]] =
+proc get_react_msg_by_thread*(guild_id, channel_id, thread_id: string): Option[(string, string)] =
+  try:
+    var res = db.getRow(sql"SELECT message_id, emoji_name FROM react2thread WHERE channel_id = ? AND thread_id = ? AND guild_id = ?",
+        channel_id, thread_id, guild_id)
+    if res[0] == "":
+      return none (string, string)
+    return some (res[0], res[1])
+  except DbError as e:
+    error(e.msg)
+    return none (string, string)
+
+proc get_threads_by_message*(guild_id, channel_id, message_id: string): Option[seq[string]] =
   try:
     var tmp = db.getAllRows(sql"SELECT thread_id FROM react2thread WHERE channel_id = ? AND guild_id = ? AND message_id = ?",
         channel_id, guild_id, message_id)
