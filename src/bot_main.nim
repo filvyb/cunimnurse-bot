@@ -14,18 +14,23 @@ import std/os
 import std/math
 import std/json
 import std/unicode
+import std/tables
 
 import config
 import db/queries as query
 import commands/verify
 import commands/mason
 import commands/jokes
+import commands/pingetter
 import utils/my_utils
 import utils/logging as clogger
 
 let conf = config.conf
 
 var guild_ids: seq[string]
+
+## TableRef[channel_id, (seq[message_id], zip_url)]
+var pin_cache = newTable[string, (seq[string], string)]()
 
 let discord* = newDiscordClient(conf.discord.token)
 var cmd* = discord.newHandler()
@@ -85,6 +90,15 @@ proc reply(i: Interaction, msg: string) {.async.} =
       )
   )
   await discord.api.createInteractionResponse(i.id, i.token, response)
+
+proc reply_priv(i: Interaction, msg: string) {.async.} =
+  await discord.api.interactionResponseMessage(i.id, i.token,
+        kind = irtChannelMessageWithSource,
+        response = InteractionCallbackDataMessage(
+            flags: {mfEphemeral},
+            content: msg
+        )
+    )
 
 proc set_reaction2thread(m: Message, emoji_name: string, thread_id: string, message_id: string) {.async.} =
   let room_id = m.channel_id
@@ -456,6 +470,52 @@ cmd.addSlash("dadjoke") do ():
   var joke = await get_dad_joke()
   await i.reply(joke)
 
+cmd.addSlash("zip-pins") do ():
+  ## Posle vsechny piny do DM
+  if i.user.isSome:
+    await i.reply_priv("Nelze v DMs")
+    return
+  let guild_id = i.guild_id.get()
+  let channel_id = i.channel_id.get()
+  let user_id = i.member.get().user.id
+
+  await i.reply_priv("Stahuji se pins")
+
+  var pin_sum = await sum_channel_pins(discord, guild_id, channel_id, pin_cache, true)
+  var ch_url = "https://discord.com/channels/" & guild_id & "/" & channel_id
+
+  var but1 = newButton(
+                label = "Odkaz na kanal!",
+                idOrUrl = ch_url,
+                emoji = Emoji(name: some "🔗"),
+                style = Link
+            )
+  var but2 = newButton(
+                label = "Smazat shrnuti!",
+                idOrUrl = "btnBookmarkDel",
+                emoji = Emoji(name: some "🗑️"),
+                style = Danger
+            )
+  var row = newActionRow(@[but1, but2])
+
+  var user_dm = await discord.api.createUserDm(user_id)
+  let g = await discord.api.getGuild(guild_id)
+
+  let channel_obj = await discord.api.getChannel(channel_id)
+
+  var emb = Embed(description: some pin_sum[1] & '\n' & pin_sum[0])
+  var embfield = @[EmbedField(name: "Channel", value: $channel_obj[0].get())]
+  emb.fields = some embfield
+
+  discard await discord.api.sendMessage(
+            user_dm.id,
+            #content = pin_sum[1],
+            components = @[row],
+            embeds = @[emb]
+        )
+  return
+
+
 # Admin and mod commands, done with $$
 cmd.addChat("help") do ():
   if msg.guild_id.isNone:
@@ -477,6 +537,7 @@ cmd.addChat("help") do ():
             $$msg-to-room-role-react <id zpravy> <id kategorie>
             $$make-teacher <uzivatel>
             $$get-rooms-in-config
+            $$sum-pins
 
             Příkazi nemají moc kontrol tak si dávejte pozor co píšete
             """
@@ -810,6 +871,19 @@ cmd.addChat("get-rooms-in-config") do ():
 
   discard await msg.reply(final_str)
 
+cmd.addChat("sum-pins") do ():
+  if msg.guild_id.isNone:
+    return
+  let guild_id = msg.guild_id.get()
+  if query.get_user_power_level(guild_id, msg.author.id) <= 2:
+    return
+
+  let room_id = msg.channel_id
+
+  var pin_sum = await sum_channel_pins(discord, guild_id, room_id, pin_cache, false)
+
+  discard await msg.reply(pin_sum[0])
+
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   for g in r.guilds:
@@ -1117,6 +1191,12 @@ proc channelUpdate(s: Shard, g: Guild, c: GuildChannel, o: Option[GuildChannel])
       for u in disc_user_to_add:
         if query.insert_channel_membership(g.id, u, channel_id):
           info(fmt"Added user {u} to channel {channel_id} {channel_name} in guild {g.id} to DB")
+
+# Invalidates pin cache
+proc channel_pins_update(s: Shard, cid: string, g: Option[Guild], last_pin: Option[string])  {.event(discord).} =
+  #echo pin_cache
+  pin_cache.del(cid)
+  #echo pin_cache
 
 # Handle bans
 proc guildBanAdd(s: Shard, g: Guild, u: User) {.event(discord).} =

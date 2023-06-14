@@ -10,6 +10,7 @@ Discord bot for 1LFCUNI written in Nim
 - Vote to add message to pins
 - Bookmarks
 - Media deduping
+- Pin summary
 
 ## Usage
 ### Prerequisites:
@@ -19,6 +20,7 @@ Discord bot for 1LFCUNI written in Nim
 * OpenSSL
 * FFmpeg
 * grep
+* ziplib
 * Optional: Python3 with [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver)
 
 ### Build or install
@@ -29,11 +31,11 @@ cd cunimnurse-bot
 ```
 You can build it with
 ```bash
-nimble build -d:ssl -d:discordCompress -d:release
+nimble build -d:ssl -d:discordCompress --threads:on -d:release
 ```
 or build and immidietly install it with
 ```bash
-nimble install -d:ssl -d:discordCompress -d:release
+nimble install -d:ssl -d:discordCompress --threads:on -d:release
 ```
 
 ### Running

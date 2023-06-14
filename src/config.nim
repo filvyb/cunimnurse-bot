@@ -35,6 +35,7 @@ type
   UtilsConf* = object of RootObj
     mason*: bool
     url_fetch_script*: string
+    catbox_userhash*: string
   Config* = object of RootObj
     discord*: DiscordConf
     database*: DatabaseConf
@@ -67,18 +68,18 @@ proc initConfig(): Config =
     result.discord.teacher_role = d["teacher_role"].getStr().toLower()
     var tmp = d["reaction_channels"].getElems()
     var tmpseq: seq[string]
-    for x in tmp:
-      tmpseq.add(x.getStr())
+    for t in tmp:
+      tmpseq.add(t.getStr())
     result.discord.reaction_channels = tmpseq
     var tmp2 = d["thread_react_channels"].getElems()
     var tmpseq2: seq[string]
-    for x in tmp2:
-      tmpseq2.add(x.getStr())
+    for t in tmp2:
+      tmpseq2.add(t.getStr())
     result.discord.thread_react_channels = tmpseq2
     var tmp3 = d["dedupe_channels"].getElems()
     var tmpseq3: seq[string]
-    for x in tmp3:
-      tmpseq3.add(x.getStr())
+    for t in tmp3:
+      tmpseq3.add(t.getStr())
     result.discord.dedupe_channels = tmpseq3
     result.discord.pin_vote_count = d["pin_vote_count"].getInt()
 
@@ -107,6 +108,7 @@ proc initConfig(): Config =
     result.utils = UtilsConf()
     result.utils.mason = u["mason"].getBool()
     result.utils.url_fetch_script = u["url_fetch_script"].getStr()
+    result.utils.catbox_userhash = u["catbox_hash"].getStr()
 
   except CatchableError as e:
     stderr.writeLine("Can't load config")
