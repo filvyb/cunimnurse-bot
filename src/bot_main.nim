@@ -272,18 +272,14 @@ cmd.addSlash("confess") do (confession: string):
   try:
     int_chan = await discord.api.getChannel(i.channel_id.get())
   except:
-    await i.reply("Funkce přiznání není nastavena")
-  if int_chan[1].isSome:
-    await i.reply("Přiznání akceptováno")
-    let msg_sent = await discord.api.sendMessage(conf.discord.confession_channel, confession)
-    let guild_ch = (await discord.api.getChannel(msg_sent.channel_id))[0].get()
-    var rep = "https://discord.com/channels/" & guild_ch.guild_id & "/" & msg_sent.channel_id & "/" & msg_sent.id
-    discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
+    await i.reply_priv("Funkce přiznání není nastavena")
+  
+  await i.reply_priv("Přiznání akceptováno")
+  let msg_sent = await discord.api.sendMessage(conf.discord.confession_channel, confession)
+  let guild_ch = (await discord.api.getChannel(msg_sent.channel_id))[0].get()
+  var rep = "https://discord.com/channels/" & guild_ch.guild_id & "/" & msg_sent.channel_id & "/" & msg_sent.id
+  discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
       content= some rep)
-  else:
-    await i.reply("Přiznej se v DMs kktko")
-    await sleepAsync(1400)
-    await discord.api.deleteInteractionResponse(i.application_id, i.token, "@original")
 
 cmd.addSlash("flip") do ():
   ## Rub či líc
