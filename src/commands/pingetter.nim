@@ -31,8 +31,8 @@ proc upload_catbox(zip_path, userhash: string): string =
   data.addFiles({"fileToUpload": zip_path}, mimeDb = mimes)
 
   let response = client.post(api_url, multipart=data)
-  if response.status == "200":
-    return response.body
+  if response.status == "200 OK":
+    return response.bodyStream.readAll()
   else:
     error("Upload to Catbox failed")
     return ""
@@ -70,8 +70,11 @@ proc zip_up(guild_id, room_id: string, msgs: seq[Message], userhash: string): st
   var zip_path = base_dir & ".zip"
   zip_folder(base_dir, zip_path)
   var url = upload_catbox(zip_path, userhash)
-  removeDir(base_dir)
-  discard tryRemoveFile(zip_path)
+  try:    
+    removeDir(base_dir)
+    discard tryRemoveFile(zip_path)
+  except CatchableError as e:
+    error(e.msg)
   return url
 
 
@@ -94,6 +97,8 @@ proc sum_channel_pins*(discord: DiscordClient, guild_id, room_id: string, pin_ca
     zip_url = await spawn zip_up(guild_id, room_id, ch_pins, conf.utils.catbox_userhash)
     pin_cache[room_id][1] = zip_url
     attach_str &= zip_url
+  elif pin_cache[room_id][1] != "":
+    zip_url = pin_cache[room_id][1]
 
   var at_count = 0
 

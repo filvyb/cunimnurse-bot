@@ -471,7 +471,7 @@ cmd.addSlash("dadjoke") do ():
   await i.reply(joke)
 
 cmd.addSlash("zip-pins") do ():
-  ## Posle vsechny piny do DM
+  ## Pošle všechny piny do DM
   if i.user.isSome:
     await i.reply_priv("Nelze v DMs")
     return
@@ -479,19 +479,19 @@ cmd.addSlash("zip-pins") do ():
   let channel_id = i.channel_id.get()
   let user_id = i.member.get().user.id
 
-  await i.reply_priv("Stahuji se pins")
+  await i.reply_priv("Stahují se piny")
 
   var pin_sum = await sum_channel_pins(discord, guild_id, channel_id, pin_cache, true)
   var ch_url = "https://discord.com/channels/" & guild_id & "/" & channel_id
 
   var but1 = newButton(
-                label = "Odkaz na kanal!",
+                label = "Odkaz na kanál!",
                 idOrUrl = ch_url,
                 emoji = Emoji(name: some "🔗"),
                 style = Link
             )
   var but2 = newButton(
-                label = "Smazat shrnuti!",
+                label = "Smazat shrnutí!",
                 idOrUrl = "btnBookmarkDel",
                 emoji = Emoji(name: some "🗑️"),
                 style = Danger
@@ -503,8 +503,8 @@ cmd.addSlash("zip-pins") do ():
 
   let channel_obj = await discord.api.getChannel(channel_id)
 
-  var emb = Embed(description: some pin_sum[1] & '\n' & pin_sum[0])
-  var embfield = @[EmbedField(name: "Channel", value: $channel_obj[0].get())]
+  var emb = Embed(description: some pin_sum[0])
+  var embfield = @[EmbedField(name: "Channel", value: $channel_obj[0].get()), EmbedField(name: "Link", value: pin_sum[1])]
   emb.fields = some embfield
 
   discard await discord.api.sendMessage(
