@@ -4,6 +4,12 @@ import std/os
 import std/unicode
 
 type
+  UploaderConf* = object of RootObj
+    site*: int
+    catbox_userhash*: string
+    linx_url*: string
+    loli_url*: string
+    loli_token*: string
   DiscordConf* = object of RootObj
     token*: string
     verify_channel*: string
@@ -35,7 +41,7 @@ type
   UtilsConf* = object of RootObj
     mason*: bool
     url_fetch_script*: string
-    catbox_userhash*: string
+    uploader*: UploaderConf
   Config* = object of RootObj
     discord*: DiscordConf
     database*: DatabaseConf
@@ -108,7 +114,17 @@ proc initConfig(): Config =
     result.utils = UtilsConf()
     result.utils.mason = u["mason"].getBool()
     result.utils.url_fetch_script = u["url_fetch_script"].getStr()
-    result.utils.catbox_userhash = u["catbox_hash"].getStr()
+
+    var uu = u["uploader"]
+    result.utils.uploader = UploaderConf()
+    result.utils.uploader.site = uu["site"].getInt()
+    if result.utils.uploader.site == 1:
+      result.utils.uploader.catbox_userhash = uu["catbox_hash"].getStr()
+    elif result.utils.uploader.site == 2:
+      result.utils.uploader.linx_url = uu["linx_url"].getStr()
+    elif result.utils.uploader.site == 3:
+      result.utils.uploader.loli_url = uu["loli_url"].getStr()
+      result.utils.uploader.loli_token = uu["loli_token"].getStr()
 
   except CatchableError as e:
     stderr.writeLine("Can't load config")

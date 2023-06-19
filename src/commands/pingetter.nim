@@ -20,6 +20,40 @@ import ../utils/logging as clogger
 
 let conf = config.conf
 
+proc upload_linx(zip_path, url: string): string =
+  var zip_name_seq = zip_path.rsplit('/')
+  var zip_name = zip_name_seq[zip_name_seq.len - 1]
+  var api_url = url.strip(chars = {'/'}) & "/upload/" & zip_name
+
+  let mimes = newMimetypes()
+  var client = newHttpClient()
+  client.headers = newHttpHeaders({ "Linx-Randomize": "yes", "Linx-Expiry": "0" })
+
+  var data = newMultipartData()
+  data.addFiles({"uploaded_file": zip_path}, mimeDb = mimes)
+
+  let response = client.put(api_url, multipart=data)
+  #echo response.repr
+  if response.status == "200 OK":
+    return response.bodyStream.readAll()
+  else:
+    return ""
+
+proc upload_loli(zip_path, url, token: string): string =
+  var api_url = url.strip(chars = {'/'}) & "/api/upload/"
+  #echo api_url
+  let mimes = newMimetypes()
+  var client = newHttpClient()
+  var data = newMultipartData()
+  data.addFiles({"FileFormName": zip_path}, mimeDb = mimes)
+
+  let response = client.post(api_url, multipart=data)
+  #echo response.repr
+  if response.status == "200 OK":
+    return response.bodyStream.readAll()
+  else:
+    return ""
+
 proc upload_catbox(zip_path, userhash: string): string =
   let api_url = "https://catbox.moe/user/api.php"
 
@@ -34,7 +68,6 @@ proc upload_catbox(zip_path, userhash: string): string =
   if response.status == "200 OK":
     return response.bodyStream.readAll()
   else:
-    error("Upload to Catbox failed")
     return ""
 
 proc zip_folder(folderPath: string, zipFilePath: string) =
@@ -50,7 +83,10 @@ proc zip_folder(folderPath: string, zipFilePath: string) =
 
   zipFile.close()
 
-proc zip_up(guild_id, room_id: string, msgs: seq[Message], userhash: string): string =
+proc zip_up(guild_id, room_id: string, msgs: seq[Message], upconf: UploaderConf): string =
+  if upconf.site == 0:
+    return ""
+
   var client = newHttpClient()
 
   var base_dir = "/tmp/" & room_id & $now().utc
@@ -69,8 +105,15 @@ proc zip_up(guild_id, room_id: string, msgs: seq[Message], userhash: string): st
 
   var zip_path = base_dir & ".zip"
   zip_folder(base_dir, zip_path)
-  var url = upload_catbox(zip_path, userhash)
-  try:    
+  var url = ""
+  if upconf.site == 1:
+    url = upload_catbox(zip_path, upconf.catbox_userhash)
+  elif upconf.site == 2:
+    url = upload_linx(zip_path, upconf.linx_url)
+  elif upconf.site == 3:
+    url = upload_loli(zip_path, upconf.loli_url, upconf.loli_token)
+
+  try:
     removeDir(base_dir)
     discard tryRemoveFile(zip_path)
   except CatchableError as e:
@@ -94,7 +137,9 @@ proc sum_channel_pins*(discord: DiscordClient, guild_id, room_id: string, pin_ca
   var attach_str = "**Soubory:**\n"
   var zip_url = ""
   if zip and pin_cache[room_id][1] == "":
-    zip_url = await spawn zip_up(guild_id, room_id, ch_pins, conf.utils.catbox_userhash)
+    zip_url = await spawn zip_up(guild_id, room_id, ch_pins, conf.utils.uploader)
+    if zip_url == "" and zip and conf.utils.uploader.site != 0:
+      error("Zip upload failed")
     pin_cache[room_id][1] = zip_url
     attach_str &= zip_url
   elif pin_cache[room_id][1] != "":

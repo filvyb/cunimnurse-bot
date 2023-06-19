@@ -10,7 +10,6 @@ import std/sequtils
 import std/strutils
 import std/sets
 import std/logging
-import std/os
 import std/math
 import std/json
 import std/unicode
