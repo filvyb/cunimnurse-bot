@@ -1,4 +1,4 @@
-import std/smtp
+import smtp
 import std/strutils
 import std/random
 import std/strformat

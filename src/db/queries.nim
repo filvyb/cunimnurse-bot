@@ -1,4 +1,4 @@
-import std/db_postgres
+import db_connector/db_postgres
 import std/strutils
 import std/options
 import std/sequtils

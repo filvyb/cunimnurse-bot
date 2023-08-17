@@ -16,7 +16,7 @@ Discord bot for 1LFCUNI written in Nim
 ### Prerequisites:
 * Postgresql (tested on 15, but should run on 10+)
 * [pgvector](https://github.com/pgvector/pgvector)
-* [Nim Lang](https://nim-lang.org/install.html) 1.6.10 or higher (should work with lower versions but I'm not testing it)
+* [Nim Lang](https://nim-lang.org/install.html) 2.0.0
 * OpenSSL
 * FFmpeg
 * grep
@@ -31,11 +31,11 @@ cd cunimnurse-bot
 ```
 You can build it with
 ```bash
-nimble build -d:ssl -d:discordCompress --threads:on -d:release
+nimble build -d:discordCompress -d:release
 ```
 or build and immidietly install it with
 ```bash
-nimble install -d:ssl -d:discordCompress --threads:on -d:release
+nimble install -d:discordCompress -d:release
 ```
 
 ### Running
