@@ -1,6 +1,7 @@
 from dimscord import Attachment
 import imageman
 import dhash
+import asynctools
 
 import std/httpclient
 import std/base64
@@ -10,7 +11,6 @@ import std/strformat
 import std/tables
 import std/sets
 import std/strutils
-import std/osproc
 import options
 
 import ../db/queries
@@ -70,7 +70,8 @@ proc dedupe_media*(guild_id, channel_id, message_id: string, attach: Attachment)
         await client.downloadFile(attach.url, file_path)
 
 
-        var ffmpeg_out = execCmdEx(fmt"ffmpeg -i {file_path} -vf 'blackdetect=d=0.05:pix_th=0.67' -an -f null - 2>&1 | grep blackdetect")
+        var ffmpeg_out_tmp = await execProcess(fmt"ffmpeg -i {file_path} -vf 'blackdetect=d=0.05:pix_th=0.67' -an -f null - 2>&1 | grep blackdetect")
+        var ffmpeg_out = (ffmpeg_out_tmp.output, ffmpeg_out_tmp.exitcode)
 
         var cut_time = ""
 
@@ -83,7 +84,8 @@ proc dedupe_media*(guild_id, channel_id, message_id: string, attach: Attachment)
               cut_time &= "-ss "
               cut_time &= ffmpeg_out_split[1].splitWhitespace()[4].split({':'})[1] & " "
 
-        var ffmpeg_thumb_out = execCmdEx(fmt"ffmpeg -i {file_path} {cut_time}-frames:v 1 /tmp/{attach.id}.png -y")
+        var ffmpeg_thumb_out_tmp = await execProcess(fmt"ffmpeg -i {file_path} {cut_time}-frames:v 1 /tmp/{attach.id}.png -y")
+        var ffmpeg_thumb_out = (ffmpeg_thumb_out_tmp.output, ffmpeg_thumb_out_tmp.exitcode)
 
         if ffmpeg_thumb_out[1] != 0:
           return (false, 0, "")

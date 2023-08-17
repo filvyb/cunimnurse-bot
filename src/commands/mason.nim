@@ -1,4 +1,5 @@
-import std/osproc
+import asynctools
+
 import std/json
 import options
 import std/logging
@@ -9,7 +10,8 @@ import ../utils/logging as clogger
 
 
 proc parse_the_numbers*(numbers: int): Future[(Option[JsonNode], Option[string])] {.async.} =
-  var browser_out = execCmdEx("python3 " & conf.utils.url_fetch_script & " https://nhentai.net/api/gallery/" & $numbers)
+  var browser_out_tmp = await execProcess("python3 " & conf.utils.url_fetch_script & " https://nhentai.net/api/gallery/" & $numbers)
+  var browser_out = (browser_out_tmp.output, browser_out_tmp.exitcode)
 
   if browser_out[1] != 0:
     error(browser_out[0])
