@@ -888,8 +888,15 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
       await sync_channels(g.id)
 
   await cmd.registerCommands()
+
+  const buildInfo = "Revision " & staticExec("git rev-parse --short HEAD")
+
+  await s.updateStatus(activity = some ActivityStatus(
+        name: buildInfo,
+        kind: atPlaying
+    ))
   
-  info("Ready as " & $r.user & " in " & $guild_ids.len & " guilds")
+  info("Ready as " & $r.user & " in " & $guild_ids.len & " guilds running " & buildInfo)
 
 # Handle on fly role changes
 proc guildRoleCreate(s: Shard, g: Guild, r: Role) {.event(discord).} =
