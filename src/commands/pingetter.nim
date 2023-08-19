@@ -26,13 +26,17 @@ proc upload_linx(zip_path, url: string): string =
   var api_url = url.strip(chars = {'/'}) & "/upload/" & zip_name
 
   let mimes = newMimetypes()
-  var client = newHttpClient()
+  var client = newHttpClient(timeout=8000)
   client.headers = newHttpHeaders({ "Linx-Randomize": "yes", "Linx-Expiry": "0" })
 
   var data = newMultipartData()
   data.addFiles({"uploaded_file": zip_path}, mimeDb = mimes)
 
-  let response = client.put(api_url, multipart=data)
+  var response: Response
+  try:
+    response = client.put(api_url, multipart=data)
+  except CatchableError:
+    return ""
   #echo response.repr
   if response.status == "200 OK":
     return response.bodyStream.readAll()
@@ -43,11 +47,15 @@ proc upload_loli(zip_path, url, token: string): string =
   var api_url = url.strip(chars = {'/'}) & "/api/upload/"
   #echo api_url
   let mimes = newMimetypes()
-  var client = newHttpClient()
+  var client = newHttpClient(timeout=8000)
   var data = newMultipartData()
   data.addFiles({"FileFormName": zip_path}, mimeDb = mimes)
 
-  let response = client.post(api_url, multipart=data)
+  var response: Response
+  try:
+    response = client.post(api_url, multipart=data)
+  except CatchableError:
+    return ""
   #echo response.repr
   if response.status == "200 OK":
     return response.bodyStream.readAll()
@@ -58,13 +66,17 @@ proc upload_catbox(zip_path, userhash: string): string =
   let api_url = "https://catbox.moe/user/api.php"
 
   let mimes = newMimetypes()
-  var client = newHttpClient()
+  var client = newHttpClient(timeout=8000)
   var data = newMultipartData()
   data["reqtype"] = "fileupload"
   data["userhash"] = userhash
   data.addFiles({"fileToUpload": zip_path}, mimeDb = mimes)
 
-  let response = client.post(api_url, multipart=data)
+  var response: Response
+  try:
+    response = client.post(api_url, multipart=data)
+  except CatchableError:
+    return ""
   if response.status == "200 OK":
     return response.bodyStream.readAll()
   else:
@@ -80,8 +92,10 @@ proc zip_folder(folderPath: string, zipFilePath: string) =
   for fp in file_paths:
     #echo fp.split('/', 3)
     zipFile.addFile(fp.split('/', 3)[3], newStringStream(readFile(fp)))
+    #echo fp.split('/', 3) & " added"
 
   zipFile.close()
+  #echo "zip fin"
 
 proc zip_up(guild_id, room_id: string, msgs: seq[Message], upconf: UploaderConf): string =
   if upconf.site == 0:
@@ -138,6 +152,7 @@ proc sum_channel_pins*(discord: DiscordClient, guild_id, room_id: string, pin_ca
   var zip_url = ""
   if zip and pin_cache[room_id][1] == "":
     zip_url = await spawn zip_up(guild_id, room_id, ch_pins, conf.utils.uploader)
+    #zip_url = zip_up(guild_id, room_id, ch_pins, conf.utils.uploader)
     if zip_url == "" and zip and conf.utils.uploader.site != 0:
       error("Zip upload failed")
     pin_cache[room_id][1] = zip_url

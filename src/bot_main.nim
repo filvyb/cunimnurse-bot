@@ -494,7 +494,6 @@ cmd.addSlash("zip-pins") do ():
   var row = newActionRow(@[but1, but2])
 
   var user_dm = await discord.api.createUserDm(user_id)
-  let g = await discord.api.getGuild(guild_id)
 
   let channel_obj = await discord.api.getChannel(channel_id)
 
