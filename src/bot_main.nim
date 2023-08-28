@@ -21,6 +21,7 @@ import commands/verify
 import commands/mason
 import commands/jokes
 import commands/pingetter
+import commands/info
 import utils/my_utils
 import utils/logging as clogger
 
@@ -508,6 +509,33 @@ cmd.addSlash("zip-pins") do ():
             embeds = @[emb]
         )
   return
+
+cmd.addSlash("pocasi") do (place: Option[string]):
+  ## Vypíše počasí v daném městě. Výchozí je Praha
+  var location = "Praha"
+  if place.isSome:
+    location = place.get()
+  
+  var res = await get_weather(location)
+
+  echo $res
+
+  if res[0] == 200:
+    let response = InteractionResponse(
+      kind: irtChannelMessageWithSource,
+      data: some InteractionApplicationCommandCallbackData(
+          embeds: @[res[1]]
+      )
+    )
+    await discord.api.createInteractionResponse(i.id, i.token, response)
+  elif res[0] == 401:
+    error("Open Weather invalid token")
+    await i.reply("F token, Valve plz fix")
+  elif res[0] == 404:
+    await i.reply("Město nenalezeno")
+  else:
+    error("Open Weather unknown error, status code " & $res[0])
+    await i.reply("Neznámá chyba, Valve plz fix")
 
 
 # Admin and mod commands, done with $$

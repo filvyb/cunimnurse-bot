@@ -41,6 +41,7 @@ type
   UtilsConf* = object of RootObj
     mason*: bool
     url_fetch_script*: string
+    openweather_token*: string
     uploader*: UploaderConf
   Config* = object of RootObj
     discord*: DiscordConf
@@ -114,6 +115,7 @@ proc initConfig(): Config =
     result.utils = UtilsConf()
     result.utils.mason = u["mason"].getBool()
     result.utils.url_fetch_script = u["url_fetch_script"].getStr()
+    result.utils.openweather_token = u["openweather_token"].getStr()
 
     var uu = u["uploader"]
     result.utils.uploader = UploaderConf()
