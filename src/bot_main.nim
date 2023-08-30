@@ -292,12 +292,12 @@ cmd.addSlash("verify") do (login: string):
   if i.channel_id.get() == conf.discord.verify_channel:
     var res = query.insert_user(i.member.get().user.id, login, 0)
     if res == false:
-      await i.reply("Už tě tu máme. Kontaktuj adminy/moderátory pokud nemás přístup")
+      await i.reply_priv("Už tě tu máme. Kontaktuj adminy/moderátory pokud nemás přístup")
     else:
       await send_verification_mail(login)
-      await i.reply("Email poslán")
+      await i.reply_priv("Email poslán")
   else:
-    await i.reply("Špatný kanál")
+    await i.reply_priv("Špatný kanál")
 
 cmd.addSlash("resetverify") do ():
   ## Použi pokud si pokazil verify
