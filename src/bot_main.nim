@@ -288,7 +288,7 @@ cmd.addSlash("flip") do ():
   await i.reply(sample(coin))
 
 cmd.addSlash("verify") do (login: string):
-  ## Zadej svoje UČO
+  ## Zadej svůj CAS login
   if i.channel_id.get() == conf.discord.verify_channel:
     var res = query.insert_user(i.member.get().user.id, login, 0)
     if res == false:
