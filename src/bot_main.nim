@@ -890,8 +890,13 @@ cmd.addChat("get-rooms-in-config") do ():
     
     final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
     final_str &= '\n'
-
-  discard await msg.reply(final_str)
+  
+  #writeFile("/tmp/rooms-in-config.txt", final_str)
+  if final_str.len < 2000:
+    discard await msg.reply(final_str)
+  else:
+    var fil = @[DiscordFile(name: "rooms-in-config.txt", body: final_str)]
+    discard await discord.api.sendMessage(msg.channel_id, files=fil)
 
 cmd.addChat("sum-pins") do ():
   if msg.guild_id.isNone:
