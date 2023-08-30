@@ -458,13 +458,19 @@ cmd.addSlash("search del") do (id: int):
 
 cmd.addSlash("yomamma") do ():
   ## Řekne vtip o tvojí mámě
-  var joke = await get_mom_joke()
+  var joke = "..."
   await i.reply(joke)
+  joke = await get_mom_joke()
+  discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
+                                                    some joke)
 
 cmd.addSlash("dadjoke") do ():
   ## Řekne dad joke
-  var joke = await get_dad_joke()
+  var joke = "..."
   await i.reply(joke)
+  joke = await get_dad_joke()
+  discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
+                                                    some joke)
 
 cmd.addSlash("zip-pins") do ():
   ## Pošle všechny piny do DM
