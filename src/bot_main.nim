@@ -766,8 +766,11 @@ cmd.addChat("msg-to-room-role-react") do (message_id: string, category_id: strin
   let room_id = msg.channel_id
   if room_id in conf.discord.reaction_channels:
     var lines = (await discord.api.getChannelMessage(room_id, message_id)).content.splitLines()
+    var count = 0
     for l in lines:
-      var spl = l.split('-')
+      if count >= 20:
+        break
+      var spl = l.rsplit('-', 1)
       if spl.len != 2:
         continue
       var role_room_name = spl[0]
@@ -777,6 +780,7 @@ cmd.addChat("msg-to-room-role-react") do (message_id: string, category_id: strin
       var therole = (await create_room_role(guild_id, role_room_name, category_id))[0]
       if query.insert_role_reaction(guild_id, emoji, room_id, therole.id, message_id):
         await discord.api.addMessageReaction(room_id, message_id, emoji)
+      count = count + 1
   else:
     discard await msg.reply("Vyběr rolí reakcemi neni na tomto kanále povolen.")
 
