@@ -31,11 +31,11 @@ cd cunimnurse-bot
 ```
 You can build it with
 ```bash
-nimble build --mm:refc -d:discordCompress -d:release
+nimble build -d:discordCompress -d:release
 ```
 or build and immidietly install it with
 ```bash
-nimble install --mm:refc -d:discordCompress -d:release
+nimble install -d:discordCompress -d:release
 ```
 
 ### Running

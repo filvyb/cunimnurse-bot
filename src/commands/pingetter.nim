@@ -1,7 +1,7 @@
 import dimscord
-import asyncthreadpool
+#import asyncthreadpool
 
-import asyncdispatch
+import stdx/asyncdispatch
 import times
 import std/strformat
 import std/tables
@@ -151,8 +151,11 @@ proc sum_channel_pins*(discord: DiscordClient, guild_id, room_id: string, pin_ca
   var attach_str = "**Soubory:**\n"
   var zip_url = ""
   if zip and pin_cache[room_id][1] == "":
-    zip_url = await spawn zip_up(guild_id, room_id, ch_pins, conf.utils.uploader)
+    #zip_url = await spawn zip_up(guild_id, room_id, ch_pins, conf.utils.uploader)
     #zip_url = zip_up(guild_id, room_id, ch_pins, conf.utils.uploader)
+    var tmpcf = conf.utils.uploader
+    awaitThread(zip_url, guild_id, room_id, ch_pins, tmpcf):
+      zip_url = zip_up(guild_id, room_id, ch_pins, tmpcf)
     if zip_url == "" and zip and conf.utils.uploader.site != 0:
       error("Zip upload failed")
     pin_cache[room_id][1] = zip_url
