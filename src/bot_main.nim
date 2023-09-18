@@ -524,8 +524,6 @@ cmd.addSlash("pocasi") do (place: Option[string]):
   
   var res = await get_weather(location)
 
-  echo $res
-
   if res[0] == 200:
     let response = InteractionResponse(
       kind: irtChannelMessageWithSource,

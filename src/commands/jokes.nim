@@ -34,7 +34,7 @@ proc get_dad_joke*(): Future[string] {.async.} =
     error(fmt"Getting dad joke failed, error {e.msg}")
     return "Dad died because he couldn't remember his blood type. I will never forget his last words. Be positive."
   let thejoke = await resp.bodyStream.read()
-  echo resp.repr
+
   if thejoke[0] == true:
     let jokeson = parseJson(thejoke[1])
     return jokeson["joke"].getStr()
