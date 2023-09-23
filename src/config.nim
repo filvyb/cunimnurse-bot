@@ -17,6 +17,8 @@ type
     thread_react_channels*: seq[string]
     dedupe_channels*: seq[string]
     confession_channel*: string
+    pin_sum_channel*: string
+    pin_categories2sum*: seq[string]
     verified_role*: string
     moderator_role*: string
     admin_role*: string
@@ -68,6 +70,7 @@ proc initConfig(): Config =
     result.discord.token = d["token"].getStr()
     result.discord.verify_channel = d["verify_channel"].getStr()
     result.discord.confession_channel = d["confession_channel"].getStr()
+    result.discord.pin_sum_channel = d["pin_sum_channel"].getStr()
     result.discord.verified_role = d["verified_role"].getStr().toLower()
     result.discord.moderator_role = d["moderator_role"].getStr().toLower()
     result.discord.helper_role = d["helper_role"].getStr().toLower()
@@ -88,6 +91,11 @@ proc initConfig(): Config =
     for t in tmp3:
       tmpseq3.add(t.getStr())
     result.discord.dedupe_channels = tmpseq3
+    var tmp4 = d["pin_categories2sum"].getElems()
+    var tmpseq4: seq[string]
+    for t in tmp4:
+      tmpseq4.add(t.getStr())
+    result.discord.pin_categories2sum = tmpseq4
     result.discord.pin_vote_count = d["pin_vote_count"].getInt()
 
     var db = x["database"]

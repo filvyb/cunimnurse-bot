@@ -483,7 +483,7 @@ cmd.addSlash("zip-pins") do ():
 
   await i.reply_priv("Stahují se piny")
 
-  var pin_sum = await sum_channel_pins(discord, guild_id, channel_id, pin_cache, true)
+  var pin_sum = await sum_channel_pins(discord, guild_id, channel_id, pin_cache, true, false)
   var ch_url = "https://discord.com/channels/" & guild_id & "/" & channel_id
 
   var but1 = newButton(
@@ -899,7 +899,6 @@ cmd.addChat("get-rooms-in-config") do ():
     final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
     final_str &= '\n'
   
-  #writeFile("/tmp/rooms-in-config.txt", final_str)
   if final_str.len < 2000:
     discard await msg.reply(final_str)
   else:
@@ -915,9 +914,11 @@ cmd.addChat("sum-pins") do ():
 
   let room_id = msg.channel_id
 
-  var pin_sum = await sum_channel_pins(discord, guild_id, room_id, pin_cache, false)
+  var pin_sum = await sum_channel_pins(discord, guild_id, room_id, pin_cache, false, true)
 
-  discard await msg.reply(pin_sum[0])
+  var fil = @[DiscordFile(name: pin_sum[2] & "_pins.md", body: pin_sum[0])]
+  discard await discord.api.sendMessage(msg.channel_id, files=fil)
+
 
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
@@ -1235,7 +1236,7 @@ proc channelUpdate(s: Shard, g: Guild, c: GuildChannel, o: Option[GuildChannel])
           info(fmt"Added user {u} to channel {channel_id} {channel_name} in guild {g.id} to DB")
 
 # Invalidates pin cache
-proc channel_pins_update(s: Shard, cid: string, g: Option[Guild], last_pin: Option[string])  {.event(discord).} =
+proc channelPinsUpdate(s: Shard, cid: string, g: Option[Guild], last_pin: Option[string])  {.event(discord).} =
   #echo pin_cache
   pin_cache.del(cid)
   #echo pin_cache

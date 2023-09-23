@@ -14,6 +14,9 @@ import streams
 import std/mimetypes
 import json
 import std/logging
+import options
+import std/enumerate
+import std/times
 
 import ../config
 import ../utils/logging as clogger
@@ -134,8 +137,26 @@ proc zip_up(guild_id, room_id: string, msgs: seq[Message], upconf: UploaderConf)
     error(e.msg)
   return url
 
+proc msgs_to_markdown(channel_name: string, channel_url: string, msgs: seq[Message]): string =
+  result &= "# [#" & channel_name & "](" & channel_url & ")\n\n"
 
-proc sum_channel_pins*(discord: DiscordClient, guild_id, room_id: string, pin_cache: TableRef[string, (seq[string], string)], zip: bool): Future[(string, string)] {.async.} =
+  for (i, msg) in enumerate(0, msgs):
+    var created_at = msg.timestamp
+    result &= "## " & $(i+1) & " " & $msg.author & " — " & created_at & "\n\n"
+    result &= "[Odkaz na zprávu](" & channel_url & ")\n\n"
+    if msg.content != "":
+      result &= "### Text\n\n" & msg.content & "\n\n"
+    var files: string
+    for f in msg.attachments:
+      if f.content_type.isSome and "image" in f.content_type.get():
+        files &= "![" & f.filename & "](" & f.url & "); \n"
+      else:
+        files &= "[" & f.filename & "](" & f.url & "); \n"
+    if files != "":
+      result &= "### Přílohy\n\n" & files & "\n\n"
+    result &= "---\n\n"
+
+proc sum_channel_pins*(discord: DiscordClient, guild_id, room_id: string, pin_cache: TableRef[string, (seq[string], string)], zip: bool, md: bool): Future[(string, string, string)] {.async.} =
   var ch_pins: seq[Message]
   if room_id in pin_cache:
     for mid in pin_cache[room_id][0]:
@@ -163,21 +184,27 @@ proc sum_channel_pins*(discord: DiscordClient, guild_id, room_id: string, pin_ca
   elif pin_cache[room_id][1] != "":
     zip_url = pin_cache[room_id][1]
 
-  var at_count = 0
+  var ch_name: string
 
-  for m in ch_pins:
-    out_str &= "*" & m.author.username & "*: "
-    if m.content.len > 0:
-      out_str &= m.content[0 ..< min(16,m.content.len - 1)] & "..." & '\n'
-    else:
-      out_str &= '\n'
-    out_str &= "https://discord.com/channels/" & guild_id & "/" & room_id & "/" & m.id & '\n' & '\n'
+  if not md:
+    var at_count = 0
 
-    for a in m.attachments:
-      at_count += 1
-      attach_str &= a.url & '\n'
+    for m in ch_pins:
+      out_str &= "*" & m.author.username & "*: "
+      if m.content.len > 0:
+        out_str &= m.content[0 ..< min(16,m.content.len - 1)] & "..." & '\n'
+      else:
+        out_str &= '\n'
+      out_str &= "https://discord.com/channels/" & guild_id & "/" & room_id & "/" & m.id & '\n' & '\n'
 
-  if not zip and at_count > 0:
-    out_str &= attach_str
+      for a in m.attachments:
+        at_count += 1
+        attach_str &= a.url & '\n'
 
-  return (out_str, zip_url)
+    if not zip and at_count > 0:
+      out_str &= attach_str
+  else:
+    ch_name = (await discord.api.getChannel(room_id))[0].get().name
+    out_str = msgs_to_markdown(ch_name, "https://discord.com/channels/" & guild_id & "/" & room_id & "/", ch_pins)
+
+  return (out_str, zip_url, ch_name)
