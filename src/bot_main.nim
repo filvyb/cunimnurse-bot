@@ -916,7 +916,13 @@ cmd.addChat("sum-pins") do ():
 
   var pin_sum = await sum_channel_pins(discord, guild_id, room_id, pin_cache, false, true)
 
-  var fil = @[DiscordFile(name: pin_sum[2] & "_pins.md", body: pin_sum[0])]
+  var fil = @[DiscordFile(name: pin_sum[2] & "_piny.md", body: pin_sum[0])]
+
+  if conf.utils.md2pdf:
+    var pdf_path = await convert_md2pdf(pin_sum[0])
+    if pdf_path != "":
+      fil &= DiscordFile(name: pin_sum[2] & "-piny.pdf", body: readFile(pdf_path))
+
   discard await discord.api.sendMessage(msg.channel_id, files=fil)
 
 

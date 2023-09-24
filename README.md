@@ -20,7 +20,8 @@ Discord bot for 1LFCUNI written in Nim
 * OpenSSL
 * FFmpeg
 * grep
-* ziplib
+* Optional: ziplib
+* Optional: Pandoc
 * Optional: Python3 with [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver)
 
 ### Build or install

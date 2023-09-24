@@ -115,3 +115,19 @@ proc dedupe_media*(guild_id, channel_id, message_id: string, attach: Attachment)
   if distance < 800:
     return (true, int((1 - distance / 3200) * 100), duplicate_med)
   return (false, 0, "")
+
+proc convert_md2pdf*(md: string): Future[string] {.async.} =
+  var md_path = "/tmp/pins.md"
+  var out_path = "/tmp/pins.pdf"
+  try:
+    writeFile(md_path, md)
+  except IOError as e:
+    error(e.msg & "\n" & "e.trace")
+    return ""
+
+  var cmd = "pandoc " & md_path & " -V colorlinks=true -V linkcolor=blue -V geometry:margin=0.4in -o " & out_path
+  var pandoc_out = await execProcess(cmd)
+  if pandoc_out.exitcode != 0:
+    error("Pandoc failed: " & pandoc_out.output)
+  else:
+    result = out_path
