@@ -873,31 +873,66 @@ cmd.addChat("get-rooms-in-config") do ():
   var final_str = "Reaction channels\n"
 
   for i in conf.discord.reaction_channels:
-    var chan = (await discord.api.getChannel(i))[0].get()
-    var guild = await discord.api.getGuild(chan.guild_id)
+    if "id" in i:
+      continue
+    try:
+      var chan = (await discord.api.getChannel(i))[0].get()
+      var guild = await discord.api.getGuild(chan.guild_id)
+
+      final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
+      final_str &= '\n'
+    except CatchableError as e:
+      error("get-rooms-in-config failed getting channel: " & e.msg)
+      continue
     
-    final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
-    final_str &= '\n'
 
   final_str &= "Thread react channels\n"
   await sleepAsync(100)
 
   for i in conf.discord.thread_react_channels:
-    var chan = (await discord.api.getChannel(i))[0].get()
-    var guild = await discord.api.getGuild(chan.guild_id)
-    
-    final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
-    final_str &= '\n'
+    if "id" in i:
+      continue
+    try:
+      var chan = (await discord.api.getChannel(i))[0].get()
+      var guild = await discord.api.getGuild(chan.guild_id)
+      
+      final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
+      final_str &= '\n'
+    except CatchableError as e:
+      error("get-rooms-in-config failed getting channel: " & e.msg)
+      continue
 
   final_str &= "Dedupe channels\n"
   await sleepAsync(100)
 
   for i in conf.discord.dedupe_channels:
-    var chan = (await discord.api.getChannel(i))[0].get()
-    var guild = await discord.api.getGuild(chan.guild_id)
-    
-    final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
-    final_str &= '\n'
+    if "id" in i:
+      continue
+    try:
+      var chan = (await discord.api.getChannel(i))[0].get()
+      var guild = await discord.api.getGuild(chan.guild_id)
+      
+      final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
+      final_str &= '\n'
+    except CatchableError as e:
+      error("get-rooms-in-config failed getting channel: " & e.msg)
+      continue
+  
+  final_str &= "Categories to summarize\n"
+  await sleepAsync(100)
+
+  for i in conf.discord.pin_categories2sum:
+    if "id" in i:
+      continue
+    try:
+      var chan = (await discord.api.getChannel(i))[0].get()
+      var guild = await discord.api.getGuild(chan.guild_id)
+      
+      final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
+      final_str &= '\n'
+    except CatchableError as e:
+      error("get-rooms-in-config failed getting channel: " & e.msg)
+      continue
   
   if final_str.len < 2000:
     discard await msg.reply(final_str)
