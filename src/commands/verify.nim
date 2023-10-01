@@ -12,7 +12,7 @@ import ../utils/logging as clogger
 
 var conf = conf.email
 
-proc send_verification_mail*(login: string) {.async} =
+proc send_verification_mail*(login: string): Future[bool] {.async} =
   randomize()
   let chars = {'a'..'z','A'..'Z'}# or {' '..'~'} for all ascii
   var code = newString(12)
@@ -33,8 +33,10 @@ proc send_verification_mail*(login: string) {.async} =
     await smtpConn.auth(conf.user.split('@')[0], conf.password)
     await smtpConn.sendmail(conf.user, @[fmt"{login}@{conf.verify_domain}"], $msg)
     await smtpConn.close()
+    return true
   except CatchableError as e:
     error("Email neposlan" & e.msg & '\n' & $e.trace)
+    return false
 
 proc check_msg_for_verification_code*(msg: string, author_id: string): bool =
   var str = msg.split(' ')

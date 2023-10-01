@@ -294,8 +294,11 @@ cmd.addSlash("verify") do (login: string):
     if res == false:
       await i.reply_priv("Už tě tu máme. Zkus /resetverify a popřípadě kontaktuj adminy/moderátory pokud nemás přístup")
     else:
-      await send_verification_mail(login)
-      await i.reply_priv("Email poslán")
+      var email_sent = send_verification_mail(login)
+      if email_sent.get():
+        await i.reply_priv("Email poslán")
+      else:
+        await i.reply_priv("Nastala chyba při posílání emailu")
   else:
     await i.reply_priv("Špatný kanál")
 
