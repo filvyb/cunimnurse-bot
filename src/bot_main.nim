@@ -578,20 +578,24 @@ cmd.addChat("forceverify") do (user: Option[User]):
   if user.isSome():
     var user_id = user.get().id
     var ver_stat = query.get_user_verification_status(user_id)
-    if ver_stat == -1:
+
+    if ver_stat < 2:
       randomize()
+      discard query.delete_user(user_id)
       var q = query.insert_user(user_id, fmt"forced_{$rand(1..100000)}", 2)
       if q == false:
         discard await msg.reply("Příkaz selhal")
         return
+
+      var ver_role = await get_verified_role_id(guild_id)
       
-      await discord.api.addGuildMemberRole(guild_id, user_id, await get_verified_role_id(guild_id))
+      await discord.api.addGuildMemberRole(guild_id, user_id, ver_role)
       discard await msg.reply("Uživatel byl ověřen")
-    elif ver_stat == 2:
-      discard await msg.reply("Uzivatel byl uz ověřen")
     else:
-      discard query.update_verified_status(user_id, 2)
-      discard await msg.reply("Uživatel byl ověřen")
+      discard await msg.reply("Uzivatel byl uz ověřen")
+    #else:
+    #  discard query.update_verified_status(user_id, 2)
+    #  discard await msg.reply("Uživatel byl ověřen")
 
   else:
     discard await msg.reply("Uživatel nenalezen")
