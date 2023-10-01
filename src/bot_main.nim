@@ -1354,7 +1354,10 @@ proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
       discard query.update_verified_status(author_id, 2)
       for g in guild_ids:
         let ver_role = await get_verified_role_id(g)
-        await discord.api.addGuildMemberRole(g, author_id, ver_role)
+        try:
+          await discord.api.addGuildMemberRole(g, author_id, ver_role)
+        except CatchableError as e:
+          error(fmt"Failed giving user {user_id} in guild {guild_id} role {role_to_give}: {e.msg} {$e.trace}" )
       discard await msg.reply("Vítej na našem serveru")
 
   if ch_type[0].isSome:
