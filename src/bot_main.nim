@@ -1357,7 +1357,7 @@ proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
         try:
           await discord.api.addGuildMemberRole(g, author_id, ver_role)
         except CatchableError as e:
-          error(fmt"Failed giving user {user_id} in guild {guild_id} role {role_to_give}: {e.msg} {$e.trace}" )
+          error(fmt"Failed giving user {author_id} in guild {g} role {ver_role}: {e.msg} {$e.trace}" )
       discard await msg.reply("Vítej na našem serveru")
 
   if ch_type[0].isSome:
