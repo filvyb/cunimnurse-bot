@@ -306,14 +306,14 @@ cmd.addSlash("resetverify") do ():
     var user_stat = query.get_user_verification_status(user_id)
     if user_stat == 1 or user_stat == 0:
       discard query.delete_user(user_id)
-      await i.reply("Můžeš použit znovu /verify")
+      await i.reply_priv("Můžeš použit znovu /verify")
     elif user_stat > 1:
       await i.reply("Něco se pokazilo. Kontaktuj adminy/moderátory")
     else:
-      await i.reply("Použij /verify")
+      await i.reply_priv("Použij /verify")
       
   else:
-    await i.reply("Špatný kanal")
+    await i.reply_priv("Špatný kanal")
 
 cmd.addSlash("ping") do ():
   ## latence

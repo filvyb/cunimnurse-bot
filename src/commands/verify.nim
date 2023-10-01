@@ -3,9 +3,12 @@ import std/strutils
 import std/random
 import std/strformat
 import asyncdispatch
+import std/logging
 
 import ../config
 import ../db/queries
+
+import ../utils/logging as clogger
 
 var conf = conf.email
 
@@ -24,11 +27,14 @@ proc send_verification_mail*(login: string) {.async} =
   var msg = createMessage("Kod pro LF1 Discord",
                         fmt"Ahoj. Zde je tvůj ověřovací kód: {code}. Napiš ho botovi do DM ve formátu: !overit <kod>  (bez zobáčků)",
                         @[fmt"{login}@{conf.verify_domain}"], @[""], headers)
-  let smtpConn = newAsyncSmtp(useSsl = conf.ssl)
-  await smtpConn.connect(conf.address, Port conf.port)
-  await smtpConn.auth(conf.user.split('@')[0], conf.password)
-  await smtpConn.sendmail(conf.user, @[fmt"{login}@{conf.verify_domain}"], $msg)
-  await smtpConn.close()
+  try:
+    let smtpConn = newAsyncSmtp(useSsl = conf.ssl)
+    await smtpConn.connect(conf.address, Port conf.port)
+    await smtpConn.auth(conf.user.split('@')[0], conf.password)
+    await smtpConn.sendmail(conf.user, @[fmt"{login}@{conf.verify_domain}"], $msg)
+    await smtpConn.close()
+  except CatchableError as e:
+    error("Email neposlan" & e.msg & '\n' & $e.trace)
 
 proc check_msg_for_verification_code*(msg: string, author_id: string): bool =
   var str = msg.split(' ')
