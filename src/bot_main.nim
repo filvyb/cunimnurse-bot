@@ -291,14 +291,18 @@ cmd.addSlash("verify") do (login: string):
   ## Zadej svůj CAS login
   if i.channel_id.get() == conf.discord.verify_channel:
     var res = query.insert_user(i.member.get().user.id, login, 0)
+    
     if res == false:
       await i.reply_priv("Už tě tu máme. Zkus /resetverify a popřípadě kontaktuj adminy/moderátory pokud nemás přístup")
     else:
+      await i.reply_priv("...")
       var email_sent = await send_verification_mail(login)
       if email_sent:
-        await i.reply_priv("Email poslán")
+        discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original", 
+                                                          some "Email poslán")
       else:
-        await i.reply_priv("Nastala chyba při posílání emailu")
+        discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original", 
+                                                          some "Nastala chyba při posílání emailu")
   else:
     await i.reply_priv("Špatný kanál")
 
