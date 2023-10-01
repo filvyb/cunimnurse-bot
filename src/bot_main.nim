@@ -294,7 +294,7 @@ cmd.addSlash("verify") do (login: string):
     if res == false:
       await i.reply_priv("Už tě tu máme. Zkus /resetverify a popřípadě kontaktuj adminy/moderátory pokud nemás přístup")
     else:
-      var email_sent = send_verification_mail(login)
+      var email_sent = await send_verification_mail(login)
       if email_sent.get():
         await i.reply_priv("Email poslán")
       else:
