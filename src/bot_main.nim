@@ -1050,7 +1050,10 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
     # Assign role
     var role_to_give = query.get_reaction_role(guild_id, emoji_name, room_id, msg_id)
     if role_to_give != "":
-      await discord.api.addGuildMemberRole(guild_id, user_id, role_to_give)
+      try:
+        await discord.api.addGuildMemberRole(guild_id, user_id, role_to_give)
+      except CatchableError as e:
+        error(fmt"Failed giving user {user_id} in guild {guild_id} role {role_to_give}: {e.msg} {$e.trace}" )
       return
 
     # Assign channel via permission overwrite
