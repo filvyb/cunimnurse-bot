@@ -22,6 +22,7 @@ password = "password"
 dbname = "dbname"
 
 [email]
+use_mail = true
 verify_domain = "mail.tld"
 address = "smtp.mail.tld"
 port = 465

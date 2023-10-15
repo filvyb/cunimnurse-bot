@@ -131,3 +131,11 @@ proc convert_md2pdf*(md: string): Future[string] {.async.} =
     error("Pandoc failed: " & pandoc_out.output)
   else:
     result = out_path
+
+proc extractBetween*(text: string, tbegin: string, tend: string, pos = 0): string =
+  try:
+    var start_pos = text.find(tbegin, pos) + tbegin.len
+    var end_pos = text.find(tend, start_pos)
+    result = text[start_pos ..< end_pos]
+  except:
+    result = ""

@@ -32,6 +32,7 @@ type
     password*: string
     dbname*: string
   EmailConf* = object of RootObj
+    use_mail*: bool
     verify_domain*: string
     address*: string
     port*: uint16
@@ -109,12 +110,14 @@ proc initConfig(): Config =
 
     var e = x["email"]
     result.email = EmailConf()
-    result.email.verify_domain = e["verify_domain"].getStr()
-    result.email.address = e["address"].getStr()
-    result.email.port = uint16(e["port"].getInt())
-    result.email.ssl = e["ssl"].getBool()
-    result.email.user = e["user"].getStr()
-    result.email.password = e["password"].getStr()
+    result.email.use_mail = e["use_mail"].getBool()
+    if result.email.use_mail:
+      result.email.verify_domain = e["verify_domain"].getStr()
+      result.email.address = e["address"].getStr()
+      result.email.port = uint16(e["port"].getInt())
+      result.email.ssl = e["ssl"].getBool()
+      result.email.user = e["user"].getStr()
+      result.email.password = e["password"].getStr()
 
     var l = x["log"]
     result.log = LogConf()

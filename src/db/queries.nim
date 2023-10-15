@@ -3,9 +3,11 @@ import std/strutils
 import std/options
 import std/sequtils
 import std/logging
+import std/times
 
 from init import db_conn
 import ../utils/logging as clogger
+import ../utils/data_structs
 
 var db = db_conn
 
@@ -66,6 +68,15 @@ proc update_user_position*(id: string, pos: int): bool =
     error(e.msg)
     return false
 
+proc update_user_info*(id, name: string, faculty: Faculty, study_type, study_branch: string, year, circle: int): bool =
+  try:
+    db.exec(sql"UPDATE verification SET name = ?, faculty = ?, study_type = ?, study_branch = ?, year = ?, circle = ? WHERE id = ?",
+        name, ord(faculty), study_type, study_branch, year, circle, id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
 proc get_user_verification_status*(id: string): int =
   try:
     var res = db.getValue(sql"SELECT status FROM verification WHERE id = ?", id)
@@ -99,6 +110,7 @@ proc get_verified_users*(): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
+#[
 proc get_user*(id: string): Option[seq[string]] =
   try:
     var res = db.getRow(sql"SELECT * FROM verification WHERE id = ?", id)
@@ -112,6 +124,37 @@ proc get_user*(id: string): Option[seq[string]] =
   except DbError as e:
     error(e.msg)
     return none(seq[string])
+  ]#
+
+
+proc get_user*(id: string): Option[DbUser] =
+  try:
+    var res = db.getRow(sql"SELECT login, name, code, status, uni_pos, joined, karma, faculty, study_type, study_branch, year, circle FROM verification WHERE id = ?", id)
+
+    if res[0] == "":
+      return none(DbUser)
+
+    var ret = DbUser()
+    
+    ret.id = id
+    ret.login = res[0]
+    ret.name = res[1]
+    ret.code = res[2]
+    ret.status = VerStatus(parseInt(res[3]))
+    ret.uni_pos = parseInt(res[4])
+    ret.joined = parse(res[5], "YYYY-MM-dd HH:mm:ss'.'ffffffzz")
+    ret.karma = parseInt(res[6])
+    ret.faculty = Faculty(parseInt(res[7].strip()))
+    ret.study_type = res[8]
+    ret.study_branch = res[9]
+    ret.year = parseInt(res[10])
+    ret.circle = parseInt(res[11])
+
+    return some(ret)
+
+  except DbError as e:
+    error(e.msg)
+    return none(DbUser)
 
 proc delete_user*(id: string): bool =
   try:
@@ -650,3 +693,22 @@ proc delete_media_message*(guild_id, channel_id, message_id: string): bool =
   except DbError as e:
     error(e.msg)
     return false
+
+proc insert_pin_sum_msg*(guild_id, channel_id, message_id: string): bool =
+  try:
+    db.exec(sql"INSERT INTO pin_summary (guild_id, channel_id, message_id) VALUES (?, ?, ?)",
+        guild_id, channel_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc get_pin_sum_time*(guild_id, channel_id, message_id: string): string =
+  try:
+    var res = db.getValue(sql"SELECT last_summary FROM pin_summary WHERE guild_id = ? AND channel_id = ? AND message_id = ? LIMIT 1",
+        guild_id, channel_id, message_id)
+    
+  except DbError as e:
+    error(e.msg)
+    return ""
+  

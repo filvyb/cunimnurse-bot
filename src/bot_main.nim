@@ -24,6 +24,7 @@ import commands/pingetter
 import commands/info
 import utils/my_utils
 import utils/logging as clogger
+import utils/data_structs
 
 let conf = config.conf
 
@@ -289,20 +290,33 @@ cmd.addSlash("flip") do ():
 
 cmd.addSlash("verify") do (login: string):
   ## Zadej svůj CAS login
+  var user_id = i.member.get().user.id
   if i.channel_id.get() == conf.discord.verify_channel:
-    var res = query.insert_user(i.member.get().user.id, login, 0)
-    
-    if res == false:
-      await i.reply_priv("Už tě tu máme. Zkus /resetverify a popřípadě kontaktuj adminy/moderátory pokud nemás přístup")
-    else:
-      await i.reply_priv("...")
-      var email_sent = await send_verification_mail(login)
-      if email_sent:
-        discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original", 
-                                                          some "Email poslán")
+    if conf.email.use_mail:
+      var res = query.insert_user(user_id, login, 0)
+      
+      if res == false:
+        await i.reply_priv("Už tě tu máme. Zkus /resetverify a popřípadě kontaktuj adminy/moderátory pokud nemás přístup")
       else:
-        discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original", 
-                                                          some "Nastala chyba při posílání emailu")
+        await i.reply_priv("...")
+        var email_sent = await send_verification_mail(login)
+        if email_sent:
+          discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original", 
+                                                            some "Email poslán")
+        else:
+          discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original", 
+                                                            some "Nastala chyba při posílání emailu")
+    else:
+      discard query.insert_user(user_id, login, 0)
+
+      await i.reply_priv("Kód a instrukce poslány do DMs")
+      var code = get_verification_code(user_id)
+      try:
+        var user_dm = await discord.api.createUserDm(user_id)
+        var text = code
+        discard await discord.api.sendMessage(user_dm.id, text)
+      except CatchableError as e:
+        error("Couldn't send DMs with code " & e.msg)
   else:
     await i.reply_priv("Špatný kanál")
 
@@ -830,15 +844,20 @@ cmd.addChat("whois") do (user_id: string):
   if user_db.isSome:
     var user_db = user_db.get()
     var user = await discord.api.getUser(user_id)
-    var embfields = @[EmbedField(name: "ID", value: user_db[0]),
-                    EmbedField(name: "Login", value: user_db[1]),
-                    EmbedField(name: "Name", value: user_db[2]),
-                    EmbedField(name: "Status", value: user_db[4]),
-                    EmbedField(name: "Position", value: user_db[5]),
-                    EmbedField(name: "Joined", value: user_db[6]),
-                    EmbedField(name: "Karma", value: user_db[7])]
+    var embfields = @[EmbedField(name: "ID", value: user_db.id),
+                    EmbedField(name: "Login", value: user_db.login),
+                    EmbedField(name: "Name", value: user_db.name),
+                    EmbedField(name: "Status", value: $user_db.status),
+                    EmbedField(name: "Position", value: $user_db.uni_pos),
+                    EmbedField(name: "Joined", value: $user_db.joined),
+                    EmbedField(name: "Karma", value: $user_db.karma),
+                    EmbedField(name: "Faculty", value: $user_db.faculty),
+                    EmbedField(name: "Type of study", value: user_db.study_type),
+                    EmbedField(name: "Branch of study", value: user_db.study_branch),
+                    EmbedField(name: "Year", value: $user_db.year),
+                    EmbedField(name: "Circle", value: $user_db.circle)]
     var the_embed = Embed(title: some "whois", description: some user.username & "#" & user.discriminator, fields: some embfields)
-      
+
     discard await discord.api.sendMessage(msg.channel_id, embeds = @[the_embed])
   if user_db.isNone:
     discard await msg.reply("Uživatel nenalezen")
@@ -1376,7 +1395,7 @@ proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
   if ch_type[1].isSome:
     #var dm = ch_type[1].get()
     # Checks verification code and assigns verified role
-    if check_msg_for_verification_code(content, author_id) == true:
+    if (await check_msg_for_verification_code(content, author_id)) == true:
       discard query.update_verified_status(author_id, 2)
       for g in guild_ids:
         let ver_role = await get_verified_role_id(g)

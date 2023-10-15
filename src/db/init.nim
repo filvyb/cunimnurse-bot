@@ -205,8 +205,9 @@ proc initializeDB*() =
 proc migrateDB*(scheme: int) =
   var scheme = scheme
   if scheme < 2:
+    echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
     try:
-      db_conn.exec(sql"DROP TABLE IF EXISTS searching CASCADE")
+      #db_conn.exec(sql"DROP TABLE IF EXISTS searching CASCADE")
       db_conn.exec(sql("""CREATE TABLE searching (
                     guild_id TEXT,
                     channel_id TEXT,
@@ -225,22 +226,71 @@ proc migrateDB*(scheme: int) =
 
       db_conn.exec(sql"UPDATE scheme SET id = 2 WHERE id = ?", scheme)
       scheme = scheme + 1
-    except DbError:
+    except DbError as e:
+      echo e.msg
       quit(99)
   if scheme < 3:
+    echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
     try:
       db_conn.exec(sql"CREATE INDEX med_id1_id2 ON media_dedupe (guild_id, channel_id)")
 
       db_conn.exec(sql"UPDATE scheme SET id = 3 WHERE id = ?", scheme)
       scheme = scheme + 1
-    except DbError:
+    except DbError as e:
+      echo e.msg
       quit(99)
   if scheme < 4:
+    echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
     try:
       db_conn.exec(sql"ALTER TABLE media_dedupe DROP COLUMN hash CASCADE")
       db_conn.exec(sql"ALTER TABLE media_dedupe ADD COLUMN grays vector(256)")
 
       db_conn.exec(sql"UPDATE scheme SET id = 4 WHERE id = ?", scheme)
       scheme = scheme + 1
-    except DbError:
+    except DbError as e:
+      echo e.msg
+      quit(99)
+  if scheme < 5:
+    echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
+    try:
+      db_conn.exec(sql"DROP TABLE IF EXISTS bookmarks CASCADE")
+
+      #db_conn.exec(sql"DROP TABLE IF EXISTS pin_summary CASCADE")
+      # target room is set in config
+      db_conn.exec(sql("""CREATE TABLE pin_summary (
+                    guild_id TEXT,
+                    channel_id TEXT,
+                    message_id TEXT,
+                    last_summary TIMESTAMPTZ default NOW(),
+                    FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE,
+                    UNIQUE(guild_id, channel_id, message_id)
+                    )"""))
+
+      db_conn.exec(sql"CREATE INDEX pin_sum_id1 ON pin_summary (guild_id)")
+      db_conn.exec(sql"CREATE INDEX pin_sum_id2_id3 ON pin_summary (channel_id, message_id)")
+      db_conn.exec(sql"CREATE INDEX pin_sum_id1_id2_id3 ON pin_summary (guild_id, channel_id, message_id)")
+
+      db_conn.exec(sql"UPDATE scheme SET id = 5 WHERE id = ?", scheme)
+      scheme = scheme + 1
+    except DbError as e:
+      echo e.msg
+      quit(99)
+  if scheme < 6:
+    echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
+    try:
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN faculty CHAR(5) DEFAULT '0'")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN study_type TEXT")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN study_branch TEXT")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN year INTEGER DEFAULT 0")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN circle INTEGER DEFAULT 0")
+
+      db_conn.exec(sql"CREATE INDEX ver_fac ON verification (faculty)")
+      db_conn.exec(sql"CREATE INDEX ver_year ON verification (year)")
+      db_conn.exec(sql"CREATE INDEX ver_fac_year ON verification (faculty, year)")
+      db_conn.exec(sql"CREATE INDEX ver_year_circle ON verification (year, circle)")
+
+      db_conn.exec(sql"UPDATE scheme SET id = 6 WHERE id = ?", scheme)
+      scheme = scheme + 1
+    except DbError as e:
+      echo e.msg
       quit(99)
