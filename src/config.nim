@@ -2,6 +2,7 @@ import parsetoml
 
 import std/os
 import std/unicode
+import std/sets
 
 type
   UploaderConf* = object of RootObj
@@ -13,12 +14,12 @@ type
   DiscordConf* = object of RootObj
     token*: string
     verify_channel*: string
-    reaction_channels*: seq[string]
-    thread_react_channels*: seq[string]
-    dedupe_channels*: seq[string]
+    reaction_channels*: HashSet[string]
+    thread_react_channels*: HashSet[string]
+    dedupe_channels*: HashSet[string]
     confession_channel*: string
     pin_sum_channel*: string
-    pin_categories2sum*: seq[string]
+    pin_categories2sum*: HashSet[string]
     verified_role*: string
     moderator_role*: string
     admin_role*: string
@@ -82,22 +83,22 @@ proc initConfig(): Config =
     var tmpseq: seq[string]
     for t in tmp:
       tmpseq.add(t.getStr())
-    result.discord.reaction_channels = tmpseq
+    result.discord.reaction_channels = toHashSet(tmpseq)
     var tmp2 = d["thread_react_channels"].getElems()
     var tmpseq2: seq[string]
     for t in tmp2:
       tmpseq2.add(t.getStr())
-    result.discord.thread_react_channels = tmpseq2
+    result.discord.thread_react_channels = toHashSet(tmpseq2)
     var tmp3 = d["dedupe_channels"].getElems()
     var tmpseq3: seq[string]
     for t in tmp3:
       tmpseq3.add(t.getStr())
-    result.discord.dedupe_channels = tmpseq3
+    result.discord.dedupe_channels = toHashSet(tmpseq3)
     var tmp4 = d["pin_categories2sum"].getElems()
     var tmpseq4: seq[string]
     for t in tmp4:
       tmpseq4.add(t.getStr())
-    result.discord.pin_categories2sum = tmpseq4
+    result.discord.pin_categories2sum = toHashSet(tmpseq4)
     result.discord.pin_vote_count = d["pin_vote_count"].getInt()
 
     var db = x["database"]

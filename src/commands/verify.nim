@@ -16,22 +16,24 @@ import ../utils/logging as clogger
 
 var conf = conf.email
 
+proc gen_random_code(len: int): string =
+  randomize()
+  let chars = {'a'..'z','A'..'Z', '0'..'9'}# or {' '..'~'} for all ascii
+  var code = newString(len)
+  for i in 0..<len:
+    code[i] = sample(chars)
+
 proc get_verification_code*(login: string): string =
   result = get_user_verification_code(login)
   if result == "":
-    randomize()
-    var code = rand(1000000..9999999)
+    var code = gen_random_code(10)
 
-    discard insert_code(login, $code)
+    discard insert_code(login, code)
     discard update_verified_status_login(login, 1)
     result = $code
 
 proc send_verification_mail*(login: string): Future[bool] {.async} =
-  randomize()
-  let chars = {'a'..'z','A'..'Z'}# or {' '..'~'} for all ascii
-  var code = newString(12)
-  for i in 0..<12:
-    code[i] = sample(chars)
+  var code = gen_random_code(10)
 
   discard insert_code(login, code)
   discard update_verified_status_login(login, 1)
