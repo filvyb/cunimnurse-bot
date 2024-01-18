@@ -19,9 +19,9 @@ var conf = conf.email
 proc gen_random_code(len: int): string =
   randomize()
   let chars = {'a'..'z','A'..'Z', '0'..'9'}# or {' '..'~'} for all ascii
-  var code = newString(len)
+  result = newString(len)
   for i in 0..<len:
-    code[i] = sample(chars)
+    result[i] = sample(chars)
 
 proc get_verification_code*(login: string): string =
   result = get_user_verification_code(login)
