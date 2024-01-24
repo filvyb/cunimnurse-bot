@@ -23,7 +23,7 @@ proc check_scheme*(): string =
 
 
 # User queries
-proc insert_user*(id: string, login: string, stat: int): bool =
+proc insert_user*(id, login: string, stat: int): bool =
   try:
     db.exec(sql"INSERT INTO verification (id, login, status) VALUES (?, ?, ?)",
         id, login, stat)
@@ -32,7 +32,7 @@ proc insert_user*(id: string, login: string, stat: int): bool =
     error(e.msg)
     return false
 
-proc insert_code*(login: string, code: string): bool =
+proc insert_code*(login, code: string): bool =
   try:
     db.exec(sql"UPDATE verification SET code = ? WHERE login = ?",
         code, login)
@@ -167,7 +167,7 @@ proc delete_user*(id: string): bool =
 
 
 # Role queries
-proc insert_role*(guild_id: string, id: string, name: string, power: int): bool =
+proc insert_role*(guild_id, id, name: string, power: int): bool =
   try:
     db.exec(sql"INSERT INTO roles (guild_id, id, name, power) VALUES (?, ?, ?, ?)",
         guild_id, id, name, power)
@@ -176,7 +176,7 @@ proc insert_role*(guild_id: string, id: string, name: string, power: int): bool 
     error(e.msg)
     return false
 
-proc update_role_name*(guild_id: string, id: string, name: string): bool =
+proc update_role_name*(guild_id, id, name: string): bool =
   try:
     db.exec(sql"UPDATE roles SET name = ? WHERE id = ? AND guild_id = ?",
         name, id, guild_id)
@@ -185,7 +185,7 @@ proc update_role_name*(guild_id: string, id: string, name: string): bool =
     error(e.msg)
     return false
 
-proc update_role_power*(guild_id: string, id: string, power: int): bool =
+proc update_role_power*(guild_id, id: string, power: int): bool =
   try:
     db.exec(sql"UPDATE roles SET power = ? WHERE id = ? AND guild_id = ?",
         power, id, guild_id)
@@ -194,7 +194,7 @@ proc update_role_power*(guild_id: string, id: string, power: int): bool =
     error(e.msg)
     return false
 
-proc get_role*(guild_id: string, id: string): Option[seq[string]] =
+proc get_role*(guild_id, id: string): Option[seq[string]] =
   try:
     var res = db.getRow(sql"SELECT id, name, power FROM roles WHERE id = ? AND guild_id = ?",
         id, guild_id)
@@ -206,7 +206,7 @@ proc get_role*(guild_id: string, id: string): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
-proc get_role_bool*(guild_id: string, id: string): bool =
+proc get_role_bool*(guild_id, id: string): bool =
   try:
     var res = get_role(guild_id, id).get()
     if res[0] == "" and res[1] == "" and res[2] == "":
@@ -216,7 +216,7 @@ proc get_role_bool*(guild_id: string, id: string): bool =
     error(e.msg)
     return false
 
-proc get_role_id_name*(guild_id: string, name: string): Option[string] =
+proc get_role_id_name*(guild_id, name: string): Option[string] =
   try:
     var res = db.getValue(sql"SELECT id FROM roles WHERE name = ? AND guild_id = ?",
         name, guild_id)
@@ -240,7 +240,7 @@ proc get_all_roles*(guild_id: string): Option[seq[Row]] =
     error(e.msg)
     return none(seq[Row])
 
-proc delete_role*(guild_id: string, id: string): bool =
+proc delete_role*(guild_id, id: string): bool =
   try:
     db.exec(sql"DELETE FROM roles WHERE id = ? AND guild_id = ?",
         id, guild_id)
@@ -249,7 +249,7 @@ proc delete_role*(guild_id: string, id: string): bool =
     error(e.msg)
     return false
 
-proc get_user_power_level*(guild_id: string, id: string): int =
+proc get_user_power_level*(guild_id, id: string): int =
   try:
     var res = db.getValue(sql"SELECT r.power FROM roles r, role_ownership o WHERE o.user_id = ? AND o.guild_id = ? GROUP BY r.power ORDER BY r.power DESC",
         id, guild_id)
@@ -262,7 +262,7 @@ proc get_user_power_level*(guild_id: string, id: string): int =
 
 
 # Role relation queries
-proc insert_role_relation*(guild_id: string, user_id: string, role_id: string): bool =
+proc insert_role_relation*(guild_id, user_id, role_id: string): bool =
   try:
     db.exec(sql"INSERT INTO role_ownership (user_id, role_id, guild_id) VALUES (?, ?, ?)",
         user_id, role_id, guild_id)
@@ -271,7 +271,7 @@ proc insert_role_relation*(guild_id: string, user_id: string, role_id: string): 
     error(e.msg)
     return false
 
-proc exists_role_relation*(guild_id: string, user_id: string, role_id: string): bool =
+proc exists_role_relation*(guild_id, user_id, role_id: string): bool =
   try:
     var res = db.getValue(sql"SELECT * FROM role_ownership WHERE user_id = ? AND role_id = ? AND guild_id = ?",
         user_id, role_id, guild_id)
@@ -282,7 +282,7 @@ proc exists_role_relation*(guild_id: string, user_id: string, role_id: string): 
     error(e.msg)
     return false
 
-proc get_all_role_users*(guild_id: string, role_id: string): Option[seq[string]] =
+proc get_all_role_users*(guild_id, role_id: string): Option[seq[string]] =
   try:
     var tmp = db.getAllRows(sql"SELECT user_id FROM role_ownership WHERE role_id = ? AND guild_id = ?",
         role_id, guild_id)
@@ -298,7 +298,7 @@ proc get_all_role_users*(guild_id: string, role_id: string): Option[seq[string]]
     error(e.msg)
     return none(seq[string])
 
-proc get_all_user_roles*(guild_id: string, user_id: string): Option[seq[string]] =
+proc get_all_user_roles*(guild_id, user_id: string): Option[seq[string]] =
   try:
     var tmp = db.getAllRows(sql"SELECT role_id FROM role_ownership WHERE user_id = ? AND guild_id = ?",
         user_id, guild_id)
@@ -314,7 +314,7 @@ proc get_all_user_roles*(guild_id: string, user_id: string): Option[seq[string]]
     error(e.msg)
     return none(seq[string])
 
-proc delete_role_relation*(guild_id: string, user_id: string, role_id: string): bool =
+proc delete_role_relation*(guild_id, user_id, role_id: string): bool =
   try:
     db.exec(sql"DELETE FROM role_ownership WHERE user_id = ? AND role_id = ? AND guild_id = ?",
         user_id, role_id, guild_id)
@@ -323,7 +323,7 @@ proc delete_role_relation*(guild_id: string, user_id: string, role_id: string): 
     error(e.msg)
     return false
 
-proc delete_all_user_role_relation*(guild_id: string, user_id: string): bool =
+proc delete_all_user_role_relation*(guild_id, user_id: string): bool =
   try:
     db.exec(sql"DELETE FROM role_ownership WHERE user_id = ? AND guild_id = ?",
         user_id, guild_id)

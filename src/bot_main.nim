@@ -43,28 +43,16 @@ proc create_room_role(guild_id: string, name: string, category_id: string): Futu
   let new_chan = await discord.api.createGuildChannel(guild_id, name, 0, some category_id, some name, permission_overwrites = some perm_over)
   return (myrole, new_chan)
 
-proc get_verified_role_id(guild_id: string): Future[string] {.async.} =
-  var role = query.get_role_id_name(guild_id, conf.discord.verified_role)
+proc get_role_id_by_name(guild_id, role_name: string): Future[string] {.async.} =
+  var role = query.get_role_id_name(guild_id, role_name)
   if role.isSome:
     return role.get()
   if role.isNone:
     var disc_roles = await discord.api.getGuildRoles(guild_id)
     for r in disc_roles:
-      if r.name.toLower() == conf.discord.verified_role:
+      if r.name.toLower() == role_name:
         return r.id
-  fatal("Couldn't find verified role in guild " & guild_id)
-  return ""
-
-proc get_teacher_role_id(guild_id: string): Future[string] {.async.} =
-  var role = query.get_role_id_name(guild_id, conf.discord.teacher_role)
-  if role.isSome:
-    return role.get()
-  if role.isNone:
-    var disc_roles = await discord.api.getGuildRoles(guild_id)
-    for r in disc_roles:
-      if r.name.toLower() == conf.discord.teacher_role:
-        return r.id
-  fatal("Couldn't find teacher role in guild " & guild_id)
+  fatal("Couldn't find " & role_name & " role in guild " & guild_id)
   return ""
 
 proc figure_channel_users(c: GuildChannel): seq[string] =
@@ -601,7 +589,7 @@ cmd.addChat("forceverify") do (user: Option[User]):
     var ver_stat = query.get_user_verification_status(user_id)
 
     if ver_stat < 2:
-      var ver_role = await get_verified_role_id(guild_id)
+      var ver_role = await get_role_id_by_name(guild_id, conf.discord.verified_role)
       
       await discord.api.addGuildMemberRole(guild_id, user_id, ver_role)
 
@@ -629,7 +617,7 @@ cmd.addChat("forceverify-id") do (user_id: string):
     var ver_stat = query.get_user_verification_status(user_id)
 
     if ver_stat < 2:
-      var ver_role = await get_verified_role_id(guild_id)
+      var ver_role = await get_role_id_by_name(guild_id, conf.discord.verified_role)
       
       await discord.api.addGuildMemberRole(guild_id, user_id, ver_role)
 
@@ -688,7 +676,7 @@ cmd.addChat("unjail") do (user: Option[User]):
       discard await msg.reply("Příkaz selhal")
       return
     for g in guild_ids:
-      var roles = @[await get_verified_role_id(g)]
+      var roles = @[await get_role_id_by_name(g, conf.discord.verified_role)]
       await discord.api.editGuildMember(g, user_id, roles = some roles)
     discard await msg.reply("Uživatel osvobozen")
   else:
@@ -707,7 +695,7 @@ cmd.addChat("make-teacher") do (user: Option[User]):
       discard await msg.reply("Příkaz selhal")
       return
     for g in guild_ids:
-      await discord.api.addGuildMemberRole(g, user_id, await get_teacher_role_id(g))
+      await discord.api.addGuildMemberRole(g, user_id, await get_role_id_by_name(g, conf.discord.teacher_role))
     discard await msg.reply("Uživatel nastaven jake učitel")
   else:
     discard await msg.reply("Uživatel nenalezen")
@@ -1067,7 +1055,7 @@ proc guildMemberAdd(s: Shard, g: Guild, m: Member) {.event(discord).} =
   let user_id = m.user.id
 
   if query.get_user_verification_status(user_id) == 2:
-    let ver_role = await get_verified_role_id(g.id)
+    let ver_role = await get_role_id_by_name(g.id, conf.discord.verified_role)
     var roles = @[ver_role]
     await discord.api.editGuildMember(g.id, user_id, roles = some roles)
 
@@ -1398,7 +1386,7 @@ proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
     if (await check_msg_for_verification_code(content, author_id)) == true:
       discard query.update_verified_status(author_id, 2)
       for g in guild_ids:
-        let ver_role = await get_verified_role_id(g)
+        let ver_role = await get_role_id_by_name(g, conf.discord.verified_role)
         try:
           await discord.api.addGuildMemberRole(g, author_id, ver_role)
         except CatchableError as e:
