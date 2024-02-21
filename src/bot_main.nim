@@ -573,6 +573,7 @@ cmd.addChat("help") do ():
             $$make-teacher <uzivatel>
             $$get-rooms-in-config
             $$sum-pins
+            $$create-role-everywhere <jmeno role> <pozice role> <hex rgb barva>
 
             Příkazi nemají moc kontrol tak si dávejte pozor co píšete
             """
@@ -1004,6 +1005,28 @@ cmd.addChat("sum-pins") do ():
 
   discard await discord.api.sendMessage(msg.channel_id, files=fil)
 
+cmd.addChat("create-role-everywhere") do (role_name: string, role_position: int, role_color: string):
+  if msg.guild_id.isNone:
+    return
+  let guild_id = msg.guild_id.get()
+  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
+    return
+
+  var f = 0
+  for g in guild_ids:
+    await sleepAsync(100)
+    try:
+      var role = await discord.api.createGuildRole(g, role_name, permissions = PermObj(allowed: {}, denied: {}), color = parseHexInt(role_color))
+      discard await discord.api.editGuildRolePosition(g, role.id, some role_position)
+    except CatchableError as e:
+      error("create-role-everywhere failed creating role: " & e.msg)
+      discard msg.reply("Failed creating role in " & g)
+      f += 1
+      continue
+  if f == 0:
+    discard msg.reply("Role created")
+  else:
+    discard msg.reply("Role created in " & $(guild_ids.len - f) & " out of " & $guild_ids.len & " servers")
 
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
