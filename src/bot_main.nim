@@ -1015,11 +1015,12 @@ proc onReady(s: Shard, r: Ready) {.event(discord).} =
 
   await cmd.registerCommands()
 
-  const buildInfo = "Revision " & staticExec("git rev-parse --short HEAD")
+  const buildInfo = "Commit " & staticExec("git rev-parse --short HEAD")
 
   await s.updateStatus(activity = some ActivityStatus(
-        name: buildInfo,
-        kind: atPlaying
+        name: "Custom Status",
+        state: some buildInfo,
+        kind: atCustom
     ))
   
   info("Ready as " & $r.user & " in " & $guild_ids.len & " guilds running " & buildInfo)
