@@ -95,6 +95,7 @@ proc get_user_verification_code*(id: string): string =
     error(e.msg)
     return ""
 
+#[
 proc get_verified_users*(): Option[seq[string]] =
   try:
     var tmp = db.getAllRows(sql"SELECT id FROM verification WHERE status = 2")
@@ -110,7 +111,7 @@ proc get_verified_users*(): Option[seq[string]] =
     error(e.msg)
     return none(seq[string])
 
-#[
+
 proc get_user*(id: string): Option[seq[string]] =
   try:
     var res = db.getRow(sql"SELECT * FROM verification WHERE id = ?", id)
@@ -155,6 +156,35 @@ proc get_user*(id: string): Option[DbUser] =
   except DbError as e:
     error(e.msg)
     return none(DbUser)
+
+proc get_verified_users*(): Option[seq[DbUser]] =
+  try:
+    var tmp = db.getAllRows(sql"SELECT id, login, name, code, status, uni_pos, joined, karma, faculty, study_type, study_branch, year, circle FROM verification WHERE status = 2")
+    if tmp.len == 0:
+      return none(seq[DbUser])
+    
+    var res: seq[DbUser]
+    for x in tmp:
+      var ret = DbUser()
+      ret.id = x[0]
+      ret.login = x[1]
+      ret.name = x[2]
+      ret.code = x[3]
+      ret.status = VerStatus(parseInt(x[4]))
+      ret.uni_pos = parseInt(x[5])
+      ret.joined = parse(x[6], "YYYY-MM-dd HH:mm:ss'.'ffffffzz")
+      ret.karma = parseInt(x[7])
+      ret.faculty = Faculty(parseInt(x[8].strip()))
+      ret.study_type = x[9]
+      ret.study_branch = x[10]
+      ret.year = parseInt(x[11])
+      ret.circle = parseInt(x[12])
+      res &= ret
+
+    return some(res)
+  except DbError as e:
+    error(e.msg)
+    return none(seq[DbUser])
 
 proc delete_user*(id: string): bool =
   try:

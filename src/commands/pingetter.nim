@@ -1,9 +1,7 @@
 import dimscord
-#import asyncthreadpool
 
 import stdx/asyncdispatch
 import times
-import std/strformat
 import std/tables
 import std/sequtils
 import std/strutils

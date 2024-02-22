@@ -12,6 +12,8 @@ moderator_role = "role name"
 admin_role = "role name"
 teacher_role = "role name"
 helper_role = "role name"
+bachelors_role_suffix = "bc"
+masters_role_suffix = "mgr"
 pin_vote_count = 5
 
 [database]

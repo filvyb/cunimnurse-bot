@@ -68,6 +68,53 @@ proc figure_channel_users(c: GuildChannel): seq[string] =
           res.add(u)
   return res
 
+proc give_user_sis_role(user: DbUser): Future[bool] {.async.} =
+  var role2give = find_role_name4user(user)
+  if role2give == "":
+    return false
+
+  for g in guild_ids:
+    let role_id = await get_role_id_by_name(g, role2give)
+    if role_id == "":
+      continue
+
+    if not query.exists_role_relation(g, user.id, (await get_role_id_by_name(g, conf.discord.verified_role))):
+      continue
+    try:
+      await discord.api.addGuildMemberRole(g, user.id, role_id)
+    except CatchableError as e:
+      error(fmt"Failed giving user {user.id} in guild {g} role {role2give}: {e.msg} {$e.trace}" )
+      continue
+  
+  return true
+
+proc give_user_sis_role(user_id: string): Future[bool] {.async.} =
+  var user = query.get_user(user_id)
+  if user.isNone:
+    return false
+
+  return await give_user_sis_role(user.get())
+
+proc give_all_users_sis_role(): Future[bool] {.async.} =
+  var users = query.get_verified_users()
+  if users.isNone:
+    return false
+
+  for us in users.get():
+    var user = us
+    if user.study_type == "":
+      if not (await parse_sis_for_user(user)):
+        continue
+      else:
+        user = query.get_user(user.id).get()
+
+    let user_role = find_role_name4user(user)
+    if user_role == "":
+      continue
+
+    discard await give_user_sis_role(us)
+
+
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
     result = await discord.api.sendMessage(m.channelId, msg)
 
@@ -1028,6 +1075,16 @@ cmd.addChat("create-role-everywhere") do (role_name: string, role_position: int,
   else:
     discard msg.reply("Role created in " & $(guild_ids.len - f) & " out of " & $guild_ids.len & " servers")
 
+cmd.addChat("sync-sis-roles") do ():
+  if msg.guild_id.isNone:
+    return
+  let guild_id = msg.guild_id.get()
+  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
+    return
+
+  discard await give_all_users_sis_role()
+  discard await msg.reply("Syncing roles with SIS done")
+  
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
   for g in r.guilds:
@@ -1415,6 +1472,7 @@ proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
           await discord.api.addGuildMemberRole(g, author_id, ver_role)
         except CatchableError as e:
           error(fmt"Failed giving user {author_id} in guild {g} role {ver_role}: {e.msg} {$e.trace}" )
+      discard await give_user_sis_role(author_id)
       discard await msg.reply("Vítej na našem serveru")
 
   if ch_type[0].isSome:

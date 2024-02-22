@@ -14,7 +14,6 @@ import ../utils/data_structs
 
 import ../utils/logging as clogger
 
-var conf = conf.email
 
 proc gen_random_code(len: int): string =
   randomize()
@@ -33,6 +32,8 @@ proc get_verification_code*(login: string): string =
     result = $code
 
 proc send_verification_mail*(login: string): Future[bool] {.async} =
+  var conf = conf.email
+
   var code = gen_random_code(10)
 
   discard insert_code(login, code)
@@ -54,13 +55,9 @@ proc send_verification_mail*(login: string): Future[bool] {.async} =
     error("Email not sent" & e.msg & '\n' & $e.trace)
     return false
 
-proc parse_sis_for_user(author_id: string): Future[bool] {.async} =
-  var dbuser = get_user(author_id)
-  var login: string
-  if dbuser.isNone:
-    return false
-  login = dbuser.get().login
-  var facult = $ord(dbuser.get().faculty)
+proc parse_sis_for_user*(dbuser: DbUser): Future[bool] {.async} =
+  var login = dbuser.login
+  var facult = $ord(dbuser.faculty)
   var url_base = "https://is.cuni.cz/studium"
   var search_url = fmt"{url_base}/kdojekdo/index.php?do=hledani&koho=s&fakulta={facult}&prijmeni=&jmeno=&login=&sidos={login}&r_zacatek=Z&sustav=&sobor_mode=text&sims_mode=text&sdruh=&svyjazyk=&pocet=50&vyhledej=Vyhledej"
   #echo search_url
@@ -89,7 +86,7 @@ proc parse_sis_for_user(author_id: string): Future[bool] {.async} =
   #echo user_page_table
 
   var code = extractBetween(extractBetween(user_page_table, "Pokoj:</th>", "/td>"), "<td>", "<")
-  if code != get_user_verification_code(author_id):
+  if code != dbuser.code:
     return false
 
   var uco = extractBetween(extractBetween(user_page_table, "(UKČO):</th>", "/td>"), "<td>", "<")
@@ -115,12 +112,19 @@ proc parse_sis_for_user(author_id: string): Future[bool] {.async} =
   except CatchableError as e:
     error("Failed parsing", e.msg)
 
-  if not update_user_info(author_id, fmt"{name} {surname}", facultynew, study_type, study_branch, year, circle):
+  if not update_user_info(dbuser.id, fmt"{name} {surname}", facultynew, study_type, study_branch, year, circle):
     return false
 
   return true
 
+proc parse_sis_for_user(author_id: string): Future[bool] {.async} =
+  var dbuser = get_user(author_id)
+  if dbuser.isNone:
+    return false
+  return await parse_sis_for_user(dbuser.get())
+
 proc check_msg_for_verification_code*(msg: string, author_id: string): Future[bool] {.async} =
+  var conf = conf.email
   var str = msg.split(' ')
   if str[0] == "!overit":
     if not conf.use_mail:
@@ -131,3 +135,22 @@ proc check_msg_for_verification_code*(msg: string, author_id: string): Future[bo
       if db_code == str[1] and ver_stat == 1:
         return true
   return false
+
+proc find_role_name4user*(user: DbUser): string =
+  var conf = conf.discord
+
+  if user.faculty == Faculty.unknown:
+    return ""
+  if user.faculty == Faculty.lf1:
+    if user.year == 0:
+      return ""
+    if user.study_type == "magisterské":
+      return $user.year & conf.masters_role_suffix
+    elif user.study_type == "bakalářské":
+      return $user.year & conf.bachelors_role_suffix
+    elif user.study_type == "doktorské":
+      return $user.year & "phd"
+    else:
+      return ""
+  else:
+    return "UK"

@@ -25,6 +25,8 @@ type
     admin_role*: string
     helper_role*: string
     teacher_role*: string
+    bachelors_role_suffix*: string
+    masters_role_suffix*: string
     pin_vote_count*: int
   DatabaseConf* = object of RootObj
     host*: string
@@ -79,6 +81,8 @@ proc initConfig(): Config =
     result.discord.helper_role = d["helper_role"].getStr().toLower()
     result.discord.admin_role = d["admin_role"].getStr().toLower()
     result.discord.teacher_role = d["teacher_role"].getStr().toLower()
+    result.discord.bachelors_role_suffix = d["bachelors_role_suffix"].getStr().toLower()
+    result.discord.masters_role_suffix = d["masters_role_suffix"].getStr().toLower()
     var tmp = d["reaction_channels"].getElems()
     var tmpseq: seq[string]
     for t in tmp:
