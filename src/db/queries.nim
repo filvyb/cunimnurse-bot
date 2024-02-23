@@ -143,7 +143,10 @@ proc get_user*(id: string): Option[DbUser] =
     ret.code = res[2]
     ret.status = VerStatus(parseInt(res[3]))
     ret.uni_pos = parseInt(res[4])
-    ret.joined = parse(res[5], "YYYY-MM-dd HH:mm:ss'.'ffffffzz")
+    try:
+      ret.joined = parse(res[5], "YYYY-MM-dd HH:mm:ss'.'ffffffzz")
+    except CatchableError as e:
+      error("Error parsing date: " & res[5] &  "\n" & e.msg)
     ret.karma = parseInt(res[6])
     ret.faculty = Faculty(parseInt(res[7].strip()))
     ret.study_type = res[8]
@@ -172,7 +175,10 @@ proc get_verified_users*(): Option[seq[DbUser]] =
       ret.code = x[3]
       ret.status = VerStatus(parseInt(x[4]))
       ret.uni_pos = parseInt(x[5])
-      ret.joined = parse(x[6], "YYYY-MM-dd HH:mm:ss'.'ffffffzz")
+      try:
+        ret.joined = parse(res[6], "YYYY-MM-dd HH:mm:ss'.'ffffffzz")
+      except CatchableError as e:
+        error("Error parsing date: " & res[6] & "\n" & e.msg)
       ret.karma = parseInt(x[7])
       ret.faculty = Faculty(parseInt(x[8].strip()))
       ret.study_type = x[9]
