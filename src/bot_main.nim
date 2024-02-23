@@ -95,24 +95,31 @@ proc give_user_sis_role(user_id: string): Future[bool] {.async.} =
 
   return await give_user_sis_role(user.get())
 
-proc give_all_users_sis_role(): Future[bool] {.async.} =
+proc give_all_users_sis_role(): Future[(int, int)] {.async.} =
   var users = query.get_verified_users()
   if users.isNone:
-    return false
+    return (0,0)
+
+  var f = 0
 
   for us in users.get():
     var user = us
 
-    if "force" in user.login:
+    if "forced" in user.login:
+      f += 1
       continue
     if user.study_type == "":
       if not (await parse_sis_for_user(user, true)):
         error("Failed parsing SIS for user " & user.id)
+        f += 1
         continue
       else:
         user = query.get_user(user.id).get()
 
-    discard await give_user_sis_role(user)
+    if not await give_user_sis_role(user):
+      f += 1
+    
+  return (f, users.get().len)
 
 
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
@@ -1112,8 +1119,13 @@ cmd.addChat("sync-sis-roles") do ():
   if query.get_user_power_level(guild_id, msg.author.id) <= 3:
     return
 
-  discard await give_all_users_sis_role()
-  discard await msg.reply("Syncing roles with SIS done")
+  var sync_res = await give_all_users_sis_role()
+  if sync_res == (0,0):
+    discard await msg.reply("Syncing roles failed")
+  elif sync_res[0] == 0:
+    discard await msg.reply("Syncing roles with SIS done")
+  else:
+    discard await msg.reply("Syncing roles with SIS done, " & $sync_res[0] & " users failed out of " & $sync_res[1])
   
 
 proc onReady(s: Shard, r: Ready) {.event(discord).} =
