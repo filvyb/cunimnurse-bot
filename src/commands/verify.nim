@@ -55,7 +55,7 @@ proc send_verification_mail*(login: string): Future[bool] {.async} =
     error("Email not sent" & e.msg & '\n' & $e.trace)
     return false
 
-proc parse_sis_for_user*(dbuser: DbUser): Future[bool] {.async} =
+proc parse_sis_for_user*(dbuser: DbUser, ignore_code = false): Future[bool] {.async} =
   var login = dbuser.login
   var facult = $ord(dbuser.faculty)
   var url_base = "https://is.cuni.cz/studium"
@@ -85,9 +85,10 @@ proc parse_sis_for_user*(dbuser: DbUser): Future[bool] {.async} =
   var user_page_table = extractBetween(user_page, "\"tab2\"><tr>", "</table>")
   #echo user_page_table
 
-  var code = extractBetween(extractBetween(user_page_table, "Pokoj:</th>", "/td>"), "<td>", "<")
-  if code != dbuser.code:
-    return false
+  if not ignore_code:
+    var code = extractBetween(extractBetween(user_page_table, "Pokoj:</th>", "/td>"), "<td>", "<")
+    if code != dbuser.code:
+      return false
 
   var uco = extractBetween(extractBetween(user_page_table, "(UKČO):</th>", "/td>"), "<td>", "<")
   if uco != login:

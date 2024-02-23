@@ -102,17 +102,17 @@ proc give_all_users_sis_role(): Future[bool] {.async.} =
 
   for us in users.get():
     var user = us
+
+    if "force" in user.login:
+      continue
     if user.study_type == "":
-      if not (await parse_sis_for_user(user)):
+      if not (await parse_sis_for_user(user, true)):
+        error("Failed parsing SIS for user " & user.id)
         continue
       else:
         user = query.get_user(user.id).get()
 
-    let user_role = find_role_name4user(user)
-    if user_role == "":
-      continue
-
-    discard await give_user_sis_role(us)
+    discard await give_user_sis_role(user)
 
 
 proc reply(m: Message, msg: string): Future[Message] {.async.} =
@@ -621,6 +621,7 @@ cmd.addChat("help") do ():
             $$get-rooms-in-config
             $$sum-pins
             $$create-role-everywhere <jmeno role> <pozice role> <hex rgb barva>
+            $$sync-sis-roles
 
             Příkazi nemají moc kontrol tak si dávejte pozor co píšete
             """
