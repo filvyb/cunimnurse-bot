@@ -621,6 +621,7 @@ cmd.addChat("help") do ():
             $$get-rooms-in-config
             $$sum-pins
             $$create-role-everywhere <jmeno role> <pozice role> <hex rgb barva>
+            $$remove-role-everywhere <jmeno role>
             $$sync-sis-roles
 
             Příkazi nemají moc kontrol tak si dávejte pozor co píšete
@@ -1064,6 +1065,11 @@ cmd.addChat("create-role-everywhere") do (role_name: string, role_position: int,
   for g in guild_ids:
     await sleepAsync(100)
     try:
+      var role_position = role_position
+      if role_position < 0:
+        var roles = query.get_all_roles(g).get()
+        role_position = roles.len + role_position
+
       var role = await discord.api.createGuildRole(g, role_name, permissions = PermObj(allowed: {}, denied: {}), color = parseHexInt(role_color))
       discard await discord.api.editGuildRolePosition(g, role.id, some role_position)
     except CatchableError as e:
@@ -1075,6 +1081,29 @@ cmd.addChat("create-role-everywhere") do (role_name: string, role_position: int,
     discard msg.reply("Role created")
   else:
     discard msg.reply("Role created in " & $(guild_ids.len - f) & " out of " & $guild_ids.len & " servers")
+
+cmd.addChat("remove-role-everywhere") do (role_name: string):
+  if msg.guild_id.isNone:
+    return
+  let guild_id = msg.guild_id.get()
+  if query.get_user_power_level(guild_id, msg.author.id) <= 3:
+    return
+
+  var f = 0
+  for g in guild_ids:
+    await sleepAsync(100)
+    try:
+      var role = await get_role_id_by_name(g, role_name)
+      await discord.api.deleteGuildRole(g, role)
+    except CatchableError as e:
+      error("remove-role-everywhere failed deleting role: " & e.msg)
+      discard msg.reply("Failed deleting role in " & g)
+      f += 1
+      continue
+  if f == 0:
+    discard msg.reply("Role deleted")
+  else:
+    discard msg.reply("Role deleted in " & $(guild_ids.len - f) & " out of " & $guild_ids.len & " servers")
 
 cmd.addChat("sync-sis-roles") do ():
   if msg.guild_id.isNone:
