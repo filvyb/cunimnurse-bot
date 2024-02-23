@@ -176,9 +176,9 @@ proc get_verified_users*(): Option[seq[DbUser]] =
       ret.status = VerStatus(parseInt(x[4]))
       ret.uni_pos = parseInt(x[5])
       try:
-        ret.joined = parse(res[6], "YYYY-MM-dd HH:mm:ss'.'ffffffzz")
+        ret.joined = parse(x[6], "YYYY-MM-dd HH:mm:ss'.'ffffffzz")
       except CatchableError as e:
-        error("Error parsing date: " & res[6] & "\n" & e.msg)
+        error("Error parsing date: " & x[6] & "\n" & e.msg)
       ret.karma = parseInt(x[7])
       ret.faculty = Faculty(parseInt(x[8].strip()))
       ret.study_type = x[9]
