@@ -22,22 +22,22 @@ proc gen_random_code(len: int): string =
   for i in 0..<len:
     result[i] = sample(chars)
 
-proc get_verification_code*(login: string): string =
-  result = get_user_verification_code(login)
+proc get_verification_code*(login: string): Future[string] {.async.} =
+  result = await get_user_verification_code(login)
   if result == "":
     var code = gen_random_code(10)
 
-    discard insert_code(login, code)
-    discard update_verified_status_login(login, 1)
+    discard await insert_code(login, code)
+    discard await update_verified_status_login(login, 1)
     result = $code
 
-proc send_verification_mail*(login: string): Future[bool] {.async} =
+proc send_verification_mail*(login: string): Future[bool] {.async.} =
   var conf = conf.email
 
   var code = gen_random_code(10)
 
-  discard insert_code(login, code)
-  discard update_verified_status_login(login, 1)
+  discard await insert_code(login, code)
+  discard await update_verified_status_login(login, 1)
 
   var headers = [("From", conf.user)]#, ("MIME-Version", "1.0"), ("Content-Type", "plain/text")]
 
@@ -113,13 +113,13 @@ proc parse_sis_for_user*(dbuser: DbUser, ignore_code = false): Future[bool] {.as
   except CatchableError as e:
     error("Failed parsing", e.msg)
 
-  if not update_user_info(dbuser.id, fmt"{name} {surname}", facultynew, study_type, study_branch, year, circle):
+  if not await update_user_info(dbuser.id, fmt"{name} {surname}", facultynew, study_type, study_branch, year, circle):
     return false
 
   return true
 
 proc parse_sis_for_user(author_id: string): Future[bool] {.async} =
-  var dbuser = get_user(author_id)
+  var dbuser = await get_user(author_id)
   if dbuser.isNone:
     return false
   return await parse_sis_for_user(dbuser.get())
@@ -131,8 +131,8 @@ proc check_msg_for_verification_code*(msg: string, author_id: string): Future[bo
     if not conf.use_mail:
       return await parse_sis_for_user(author_id)
     if str.len == 2:
-      var db_code = get_user_verification_code(author_id)
-      var ver_stat = get_user_verification_status(author_id)
+      var db_code = await get_user_verification_code(author_id)
+      var ver_stat = await get_user_verification_status(author_id)
       if db_code == str[1] and ver_stat == 1:
         return true
   return false

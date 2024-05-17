@@ -22,6 +22,7 @@ port = "5432"
 user = "user"
 password = "password"
 dbname = "dbname"
+pool_size = 10
 
 [email]
 use_mail = true

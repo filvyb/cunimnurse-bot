@@ -99,7 +99,7 @@ proc dedupe_media*(guild_id, channel_id, message_id: string, attach: Attachment)
     return (false, 0, "")
 
   let grays = get_grays(file_path, 16, 16)
-  let query_res = get_media_distance(guild_id, channel_id, grays)
+  let query_res = await get_media_distance(guild_id, channel_id, grays)
 
   discard insert_media(guild_id, channel_id, message_id, attach.id, grays)
 
