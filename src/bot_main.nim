@@ -23,6 +23,7 @@ import commands/jokes
 import commands/pingetter
 import commands/info
 import utils/my_utils
+import utils/media_dedupe
 import utils/logging as clogger
 import utils/data_structs
 
