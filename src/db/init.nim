@@ -1,20 +1,19 @@
+import db_connector/db_postgres
 import std/strformat
-import pg
-import asyncdispatch
 
 import ../config
 
 let conf = config.conf.database
 
-let dbpool* = newAsyncPool(fmt"{conf.host}:{conf.port}", conf.user, conf.password, conf.dbname, 10)
+let db_conn* = open("", conf.user, conf.password, fmt"host={conf.host} port={conf.port} dbname={conf.dbname}")
 
-proc initializeDB*() {.async.} =
-  await dbpool.exec(sql"DROP TABLE IF EXISTS verification CASCADE")
+proc initializeDB*() =
+  db_conn.exec(sql"DROP TABLE IF EXISTS verification CASCADE")
   # Status
   # 0 = unverified, 1 = pending, 2 = verified, 3 = banned, 4 = jailed
   # uni_pos
   # 0 = student, 2 = graduate, 3 = teacher, 4 = host
-  await dbpool.exec(sql("""CREATE TABLE verification (
+  db_conn.exec(sql("""CREATE TABLE verification (
                  id TEXT PRIMARY KEY,
                  login TEXT UNIQUE,
                  name TEXT,
@@ -30,10 +29,10 @@ proc initializeDB*() {.async.} =
   #db_conn.exec(sql"CREATE TRIGGER tsvectorupdate BEFORE UPDATE ON login FOR EACH ROW WHEN (old.text IS DISTINCT FROM new.text) EXECUTE PROCEDURE tsv_update_trigger()")
   #db_conn.exec(sql"CREATE TRIGGER tsvectorinsert BEFORE INSERT ON login FOR EACH ROW EXECUTE PROCEDURE tsv_update_trigger();")
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS roles CASCADE")
+  db_conn.exec(sql"DROP TABLE IF EXISTS roles CASCADE")
   # Power
   # 0 = unverified, 1 = verified, 2 = mod, 3 = helper, 4 = admin
-  await dbpool.exec(sql("""CREATE TABLE roles (
+  db_conn.exec(sql("""CREATE TABLE roles (
                  guild_id TEXT,
                  id TEXT,
                  name TEXT,
@@ -41,32 +40,32 @@ proc initializeDB*() {.async.} =
                  PRIMARY KEY (guild_id, id)
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS role_ownership CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE role_ownership (
+  db_conn.exec(sql"DROP TABLE IF EXISTS role_ownership CASCADE")
+  db_conn.exec(sql("""CREATE TABLE role_ownership (
                  user_id TEXT references verification(id) ON DELETE CASCADE,
                  role_id TEXT,
                  guild_id TEXT,
                  FOREIGN KEY(guild_id, role_id) references roles(guild_id, id) ON DELETE CASCADE
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS channels CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE channels (
+  db_conn.exec(sql"DROP TABLE IF EXISTS channels CASCADE")
+  db_conn.exec(sql("""CREATE TABLE channels (
                  guild_id TEXT,
                  id TEXT,
                  name TEXT,
                  PRIMARY KEY (guild_id, id)
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS channel_membership CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE channel_membership (
+  db_conn.exec(sql"DROP TABLE IF EXISTS channel_membership CASCADE")
+  db_conn.exec(sql("""CREATE TABLE channel_membership (
                  user_id TEXT references verification(id) ON DELETE CASCADE,
                  channel_id TEXT,
                  guild_id TEXT,
                  FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS react2role CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE react2role (
+  db_conn.exec(sql"DROP TABLE IF EXISTS react2role CASCADE")
+  db_conn.exec(sql("""CREATE TABLE react2role (
                  guild_id TEXT,
                  emoji_name TEXT NOT NULL,
                  channel_id TEXT,
@@ -76,8 +75,8 @@ proc initializeDB*() {.async.} =
                  FOREIGN KEY(guild_id, role_id) references roles(guild_id, id) ON DELETE CASCADE
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS react2thread CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE react2thread (
+  db_conn.exec(sql"DROP TABLE IF EXISTS react2thread CASCADE")
+  db_conn.exec(sql("""CREATE TABLE react2thread (
                  guild_id TEXT,
                  emoji_name TEXT NOT NULL,
                  channel_id TEXT,
@@ -86,8 +85,8 @@ proc initializeDB*() {.async.} =
                  FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS react2chan CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE react2chan (
+  db_conn.exec(sql"DROP TABLE IF EXISTS react2chan CASCADE")
+  db_conn.exec(sql("""CREATE TABLE react2chan (
                  guild_id TEXT,
                  emoji_name TEXT NOT NULL,
                  channel_id TEXT,
@@ -97,8 +96,8 @@ proc initializeDB*() {.async.} =
                  FOREIGN KEY(guild_id, target_channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS bookmarks CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE bookmarks (
+  db_conn.exec(sql"DROP TABLE IF EXISTS bookmarks CASCADE")
+  db_conn.exec(sql("""CREATE TABLE bookmarks (
                  user_id TEXT references verification(id),
                  guild_id TEXT,
                  channel_id TEXT,
@@ -107,16 +106,16 @@ proc initializeDB*() {.async.} =
                  FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS video_links CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE video_links (
+  db_conn.exec(sql"DROP TABLE IF EXISTS video_links CASCADE")
+  db_conn.exec(sql("""CREATE TABLE video_links (
                  subject TEXT NOT NULL,
                  username TEXT NOT NULL,
                  name TEXT NOT NULL,
                  link TEXT NOT NULL
                  )"""))
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS media_dedupe CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE media_dedupe (
+  db_conn.exec(sql"DROP TABLE IF EXISTS media_dedupe CASCADE")
+  db_conn.exec(sql("""CREATE TABLE media_dedupe (
                  guild_id TEXT,
                  channel_id TEXT,
                  message_id TEXT NOT NULL,
@@ -127,89 +126,89 @@ proc initializeDB*() {.async.} =
 
 
   # Indexes
-  await dbpool.exec(sql"CREATE INDEX ver_log ON verification (login)")
-  await dbpool.exec(sql"CREATE INDEX ver_sta ON verification (status)")
-  await dbpool.exec(sql"CREATE INDEX ver_id_log ON verification (id, login)")
-  await dbpool.exec(sql"CREATE INDEX ver_id_sta ON verification (id, status)")
-  await dbpool.exec(sql"CREATE INDEX ver_id_cod ON verification (id, code)")
+  db_conn.exec(sql"CREATE INDEX ver_log ON verification (login)")
+  db_conn.exec(sql"CREATE INDEX ver_sta ON verification (status)")
+  db_conn.exec(sql"CREATE INDEX ver_id_log ON verification (id, login)")
+  db_conn.exec(sql"CREATE INDEX ver_id_sta ON verification (id, status)")
+  db_conn.exec(sql"CREATE INDEX ver_id_cod ON verification (id, code)")
 
-  await dbpool.exec(sql"CREATE INDEX rol_id1 ON roles (guild_id)")
-  #await dbpool.exec(sql"CREATE INDEX rol_id1_id2 ON roles (guild_id, id)")
-  await dbpool.exec(sql"CREATE INDEX rol_id2_pow ON roles (id, power)")
-  await dbpool.exec(sql"CREATE INDEX rol_id1_id2_pow ON roles (guild_id, id, power)")
+  db_conn.exec(sql"CREATE INDEX rol_id1 ON roles (guild_id)")
+  #db_conn.exec(sql"CREATE INDEX rol_id1_id2 ON roles (guild_id, id)")
+  db_conn.exec(sql"CREATE INDEX rol_id2_pow ON roles (id, power)")
+  db_conn.exec(sql"CREATE INDEX rol_id1_id2_pow ON roles (guild_id, id, power)")
 
-  await dbpool.exec(sql"CREATE INDEX rolown_id1_id2_id3 ON role_ownership (user_id, role_id, guild_id)")
-  await dbpool.exec(sql"CREATE INDEX rolown_id1_id2 ON role_ownership (user_id, role_id)")
-  await dbpool.exec(sql"CREATE INDEX rolown_id1 ON role_ownership (user_id)")
-  await dbpool.exec(sql"CREATE INDEX rolown_id2 ON role_ownership (role_id)")
-  await dbpool.exec(sql"CREATE INDEX rolown_id3 ON role_ownership (guild_id)")
+  db_conn.exec(sql"CREATE INDEX rolown_id1_id2_id3 ON role_ownership (user_id, role_id, guild_id)")
+  db_conn.exec(sql"CREATE INDEX rolown_id1_id2 ON role_ownership (user_id, role_id)")
+  db_conn.exec(sql"CREATE INDEX rolown_id1 ON role_ownership (user_id)")
+  db_conn.exec(sql"CREATE INDEX rolown_id2 ON role_ownership (role_id)")
+  db_conn.exec(sql"CREATE INDEX rolown_id3 ON role_ownership (guild_id)")
 
-  await dbpool.exec(sql"CREATE INDEX ch_id1 ON channels (guild_id)")
+  db_conn.exec(sql"CREATE INDEX ch_id1 ON channels (guild_id)")
   
-  await dbpool.exec(sql"CREATE INDEX chmem_id1_id2_id3 ON channel_membership (user_id, channel_id, guild_id)")
-  await dbpool.exec(sql"CREATE INDEX chmem_id1_id2 ON channel_membership (user_id, channel_id)")
-  await dbpool.exec(sql"CREATE INDEX chmem_id1 ON channel_membership (user_id)")
-  await dbpool.exec(sql"CREATE INDEX chmem_id2 ON channel_membership (channel_id)")
-  await dbpool.exec(sql"CREATE INDEX chmem_id3 ON channel_membership (guild_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id1_id2_id3 ON channel_membership (user_id, channel_id, guild_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id1_id2 ON channel_membership (user_id, channel_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id1 ON channel_membership (user_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id2 ON channel_membership (channel_id)")
+  db_conn.exec(sql"CREATE INDEX chmem_id3 ON channel_membership (guild_id)")
 
-  await dbpool.exec(sql"CREATE INDEX r2r_id1 ON react2role (guild_id)")
-  await dbpool.exec(sql"CREATE INDEX r2r_id2 ON react2role (channel_id)")
-  await dbpool.exec(sql"CREATE INDEX r2r_id3 ON react2role (role_id)")
-  await dbpool.exec(sql"CREATE INDEX r2r_id4 ON react2role (message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2r_id1_id3_id4 ON react2role (guild_id, role_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2r_id1_name_id2_id4 ON react2role (guild_id, emoji_name, channel_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2r_name_id_id2_id3_id4 ON react2role (guild_id, emoji_name, channel_id, role_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id1 ON react2role (guild_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id2 ON react2role (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id3 ON react2role (role_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id4 ON react2role (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id1_id3_id4 ON react2role (guild_id, role_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_id1_name_id2_id4 ON react2role (guild_id, emoji_name, channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2r_name_id_id2_id3_id4 ON react2role (guild_id, emoji_name, channel_id, role_id, message_id)")
 
-  await dbpool.exec(sql"CREATE INDEX r2t_id1 ON react2thread (guild_id)")
-  await dbpool.exec(sql"CREATE INDEX r2t_id2 ON react2thread (channel_id)")
-  await dbpool.exec(sql"CREATE INDEX r2t_id3 ON react2thread (thread_id)")
-  await dbpool.exec(sql"CREATE INDEX r2t_id4 ON react2thread (message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2t_id3_id4 ON react2thread (thread_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2t_id1_id2_id3_id4 ON react2thread (guild_id, channel_id, thread_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2t_id1_name_id2_id4 ON react2thread (guild_id, emoji_name, channel_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2t_name_id1_id2_id3_id4 ON react2thread (guild_id, emoji_name, channel_id, thread_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id1 ON react2thread (guild_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id2 ON react2thread (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id3 ON react2thread (thread_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id4 ON react2thread (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id3_id4 ON react2thread (thread_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id1_id2_id3_id4 ON react2thread (guild_id, channel_id, thread_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_id1_name_id2_id4 ON react2thread (guild_id, emoji_name, channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2t_name_id1_id2_id3_id4 ON react2thread (guild_id, emoji_name, channel_id, thread_id, message_id)")
 
-  await dbpool.exec(sql"CREATE INDEX r2c_id1 ON react2chan (guild_id)")
-  await dbpool.exec(sql"CREATE INDEX r2c_id2 ON react2chan (channel_id)")
-  await dbpool.exec(sql"CREATE INDEX r2c_id3 ON react2chan (target_channel_id)")
-  await dbpool.exec(sql"CREATE INDEX r2c_id4 ON react2chan (message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2c_id3_id4 ON react2chan (target_channel_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2c_id1_id2_id3_id4 ON react2chan (guild_id, channel_id, target_channel_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2c_id1_name_id2_id4 ON react2chan (guild_id, emoji_name, channel_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX r2c_name_id_id2_id3_id4 ON react2chan (guild_id, emoji_name, channel_id, target_channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id1 ON react2chan (guild_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id2 ON react2chan (channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id3 ON react2chan (target_channel_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id4 ON react2chan (message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id3_id4 ON react2chan (target_channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id1_id2_id3_id4 ON react2chan (guild_id, channel_id, target_channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_id1_name_id2_id4 ON react2chan (guild_id, emoji_name, channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX r2c_name_id_id2_id3_id4 ON react2chan (guild_id, emoji_name, channel_id, target_channel_id, message_id)")
 
-  await dbpool.exec(sql"CREATE INDEX book_id ON bookmarks (user_id)")
-  await dbpool.exec(sql"CREATE INDEX book_id2 ON bookmarks (guild_id)")
-  await dbpool.exec(sql"CREATE INDEX book_id3 ON bookmarks (channel_id)")
-  await dbpool.exec(sql"CREATE INDEX book_id4 ON bookmarks (message_id)")
-  await dbpool.exec(sql"CREATE INDEX book_id_id3 ON bookmarks (user_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX book_id2_id3 ON bookmarks (channel_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX book_id_id4 ON bookmarks (user_id, interaction_id)")
+  db_conn.exec(sql"CREATE INDEX book_id ON bookmarks (user_id)")
+  db_conn.exec(sql"CREATE INDEX book_id2 ON bookmarks (guild_id)")
+  db_conn.exec(sql"CREATE INDEX book_id3 ON bookmarks (channel_id)")
+  db_conn.exec(sql"CREATE INDEX book_id4 ON bookmarks (message_id)")
+  db_conn.exec(sql"CREATE INDEX book_id_id3 ON bookmarks (user_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX book_id2_id3 ON bookmarks (channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX book_id_id4 ON bookmarks (user_id, interaction_id)")
 
-  await dbpool.exec(sql"CREATE INDEX vid_sub ON video_links (subject)")
+  db_conn.exec(sql"CREATE INDEX vid_sub ON video_links (subject)")
 
-  await dbpool.exec(sql"CREATE INDEX med_id ON media_dedupe (guild_id)")
-  await dbpool.exec(sql"CREATE INDEX med_id2 ON media_dedupe (channel_id)")
-  await dbpool.exec(sql"CREATE INDEX med_id3 ON media_dedupe (message_id)")
-  await dbpool.exec(sql"CREATE INDEX med_hash ON media_dedupe (hash)")
-  await dbpool.exec(sql"CREATE INDEX med_id2_hash ON media_dedupe (channel_id, hash)")
-  await dbpool.exec(sql"CREATE INDEX med_id3_hash ON media_dedupe (media_id, hash)")
-  await dbpool.exec(sql"CREATE INDEX med_id1_id2_hash ON media_dedupe (guild_id, channel_id, hash)")
-  await dbpool.exec(sql"CREATE INDEX med_id2_id3 ON media_dedupe (channel_id, message_id)")
-  await dbpool.exec(sql"CREATE INDEX med_id1_id2_id3_id4 ON media_dedupe (guild_id, channel_id, message_id, media_id)")
+  db_conn.exec(sql"CREATE INDEX med_id ON media_dedupe (guild_id)")
+  db_conn.exec(sql"CREATE INDEX med_id2 ON media_dedupe (channel_id)")
+  db_conn.exec(sql"CREATE INDEX med_id3 ON media_dedupe (message_id)")
+  db_conn.exec(sql"CREATE INDEX med_hash ON media_dedupe (hash)")
+  db_conn.exec(sql"CREATE INDEX med_id2_hash ON media_dedupe (channel_id, hash)")
+  db_conn.exec(sql"CREATE INDEX med_id3_hash ON media_dedupe (media_id, hash)")
+  db_conn.exec(sql"CREATE INDEX med_id1_id2_hash ON media_dedupe (guild_id, channel_id, hash)")
+  db_conn.exec(sql"CREATE INDEX med_id2_id3 ON media_dedupe (channel_id, message_id)")
+  db_conn.exec(sql"CREATE INDEX med_id1_id2_id3_id4 ON media_dedupe (guild_id, channel_id, message_id, media_id)")
 
-  await dbpool.exec(sql"DROP TABLE IF EXISTS scheme CASCADE")
-  await dbpool.exec(sql("""CREATE TABLE scheme (
+  db_conn.exec(sql"DROP TABLE IF EXISTS scheme CASCADE")
+  db_conn.exec(sql("""CREATE TABLE scheme (
                  id INTEGER UNIQUE)"""))
-  await dbpool.exec(sql"INSERT INTO scheme(id) VALUES(1)")
+  db_conn.exec(sql"INSERT INTO scheme(id) VALUES(1)")
 
-proc migrateDB*(scheme: int) {.async.} =
+proc migrateDB*(scheme: int) =
   var scheme = scheme
   if scheme < 2:
     echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
     try:
-      #await dbpool.exec(sql"DROP TABLE IF EXISTS searching CASCADE")
-      await dbpool.exec(sql("""CREATE TABLE searching (
+      #db_conn.exec(sql"DROP TABLE IF EXISTS searching CASCADE")
+      db_conn.exec(sql("""CREATE TABLE searching (
                     guild_id TEXT,
                     channel_id TEXT,
                     user_id TEXT references verification(id) ON DELETE CASCADE,
@@ -219,46 +218,46 @@ proc migrateDB*(scheme: int) {.async.} =
                     UNIQUE(guild_id, channel_id, search_id)
                     )"""))
 
-      await dbpool.exec(sql"CREATE INDEX sear_id1 ON searching (guild_id)")
-      await dbpool.exec(sql"CREATE INDEX sear_id2 ON searching (channel_id)")
-      await dbpool.exec(sql"CREATE INDEX sear_id3 ON searching (user_id)")
-      await dbpool.exec(sql"CREATE INDEX sear_id1_id2 ON searching (guild_id, channel_id)")
-      await dbpool.exec(sql"CREATE INDEX sear_id1_id2_id4 ON searching (guild_id, channel_id, search_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id1 ON searching (guild_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id2 ON searching (channel_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id3 ON searching (user_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id1_id2 ON searching (guild_id, channel_id)")
+      db_conn.exec(sql"CREATE INDEX sear_id1_id2_id4 ON searching (guild_id, channel_id, search_id)")
 
-      await dbpool.exec(sql"UPDATE scheme SET id = 2 WHERE id = ?", @[$scheme])
+      db_conn.exec(sql"UPDATE scheme SET id = 2 WHERE id = ?", scheme)
       scheme = scheme + 1
-    except PGError as e:
+    except DbError as e:
       echo e.msg
       quit(99)
   if scheme < 3:
     echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
     try:
-      await dbpool.exec(sql"CREATE INDEX med_id1_id2 ON media_dedupe (guild_id, channel_id)")
+      db_conn.exec(sql"CREATE INDEX med_id1_id2 ON media_dedupe (guild_id, channel_id)")
 
-      await dbpool.exec(sql"UPDATE scheme SET id = 3 WHERE id = ?", @[$scheme])
+      db_conn.exec(sql"UPDATE scheme SET id = 3 WHERE id = ?", scheme)
       scheme = scheme + 1
-    except PGError as e:
+    except DbError as e:
       echo e.msg
       quit(99)
   if scheme < 4:
     echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
     try:
-      await dbpool.exec(sql"ALTER TABLE media_dedupe DROP COLUMN hash CASCADE")
-      await dbpool.exec(sql"ALTER TABLE media_dedupe ADD COLUMN grays vector(256)")
+      db_conn.exec(sql"ALTER TABLE media_dedupe DROP COLUMN hash CASCADE")
+      db_conn.exec(sql"ALTER TABLE media_dedupe ADD COLUMN grays vector(256)")
 
-      await dbpool.exec(sql"UPDATE scheme SET id = 4 WHERE id = ?", @[$scheme])
+      db_conn.exec(sql"UPDATE scheme SET id = 4 WHERE id = ?", scheme)
       scheme = scheme + 1
-    except PGError as e:
+    except DbError as e:
       echo e.msg
       quit(99)
   if scheme < 5:
     echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
     try:
-      await dbpool.exec(sql"DROP TABLE IF EXISTS bookmarks CASCADE")
+      db_conn.exec(sql"DROP TABLE IF EXISTS bookmarks CASCADE")
 
-      #await dbpool.exec(sql"DROP TABLE IF EXISTS pin_summary CASCADE")
+      #db_conn.exec(sql"DROP TABLE IF EXISTS pin_summary CASCADE")
       # target room is set in config
-      await dbpool.exec(sql("""CREATE TABLE pin_summary (
+      db_conn.exec(sql("""CREATE TABLE pin_summary (
                     guild_id TEXT,
                     channel_id TEXT,
                     message_id TEXT,
@@ -267,31 +266,31 @@ proc migrateDB*(scheme: int) {.async.} =
                     UNIQUE(guild_id, channel_id, message_id)
                     )"""))
 
-      await dbpool.exec(sql"CREATE INDEX pin_sum_id1 ON pin_summary (guild_id)")
-      await dbpool.exec(sql"CREATE INDEX pin_sum_id2_id3 ON pin_summary (channel_id, message_id)")
-      await dbpool.exec(sql"CREATE INDEX pin_sum_id1_id2_id3 ON pin_summary (guild_id, channel_id, message_id)")
+      db_conn.exec(sql"CREATE INDEX pin_sum_id1 ON pin_summary (guild_id)")
+      db_conn.exec(sql"CREATE INDEX pin_sum_id2_id3 ON pin_summary (channel_id, message_id)")
+      db_conn.exec(sql"CREATE INDEX pin_sum_id1_id2_id3 ON pin_summary (guild_id, channel_id, message_id)")
 
-      await dbpool.exec(sql"UPDATE scheme SET id = 5 WHERE id = ?", @[$scheme])
+      db_conn.exec(sql"UPDATE scheme SET id = 5 WHERE id = ?", scheme)
       scheme = scheme + 1
-    except PGError as e:
+    except DbError as e:
       echo e.msg
       quit(99)
   if scheme < 6:
     echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
     try:
-      await dbpool.exec(sql"ALTER TABLE verification ADD COLUMN faculty CHAR(5) DEFAULT '0'")
-      await dbpool.exec(sql"ALTER TABLE verification ADD COLUMN study_type TEXT")
-      await dbpool.exec(sql"ALTER TABLE verification ADD COLUMN study_branch TEXT")
-      await dbpool.exec(sql"ALTER TABLE verification ADD COLUMN year INTEGER DEFAULT 0")
-      await dbpool.exec(sql"ALTER TABLE verification ADD COLUMN circle INTEGER DEFAULT 0")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN faculty CHAR(5) DEFAULT '0'")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN study_type TEXT")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN study_branch TEXT")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN year INTEGER DEFAULT 0")
+      db_conn.exec(sql"ALTER TABLE verification ADD COLUMN circle INTEGER DEFAULT 0")
 
-      await dbpool.exec(sql"CREATE INDEX ver_fac ON verification (faculty)")
-      await dbpool.exec(sql"CREATE INDEX ver_year ON verification (year)")
-      await dbpool.exec(sql"CREATE INDEX ver_fac_year ON verification (faculty, year)")
-      await dbpool.exec(sql"CREATE INDEX ver_year_circle ON verification (year, circle)")
+      db_conn.exec(sql"CREATE INDEX ver_fac ON verification (faculty)")
+      db_conn.exec(sql"CREATE INDEX ver_year ON verification (year)")
+      db_conn.exec(sql"CREATE INDEX ver_fac_year ON verification (faculty, year)")
+      db_conn.exec(sql"CREATE INDEX ver_year_circle ON verification (year, circle)")
 
-      await dbpool.exec(sql"UPDATE scheme SET id = 6 WHERE id = ?", @[$scheme])
+      db_conn.exec(sql"UPDATE scheme SET id = 6 WHERE id = ?", scheme)
       scheme = scheme + 1
-    except PGError as e:
+    except DbError as e:
       echo e.msg
       quit(99)

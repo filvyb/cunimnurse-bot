@@ -8,12 +8,12 @@ import bot_main
 import db/queries
 
 when is_main_module:
-  var db_scheme = waitFor check_scheme()
+  var db_scheme = check_scheme()
   if db_scheme == "":
-    waitFor initializeDB()
-  db_scheme = waitFor check_scheme()
+    initializeDB()
+  db_scheme = check_scheme()
   if db_scheme != "":
-    waitFor migrateDB(parseInt(db_scheme))
+    migrateDB(parseInt(db_scheme))
   
   let discord = bot_main.discord
 

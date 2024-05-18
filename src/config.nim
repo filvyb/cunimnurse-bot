@@ -34,7 +34,6 @@ type
     user*: string
     password*: string
     dbname*: string
-    pool*: int
   EmailConf* = object of RootObj
     use_mail*: bool
     verify_domain*: string
@@ -113,7 +112,6 @@ proc initConfig(): Config =
     result.database.user = db["user"].getStr()
     result.database.password = db["password"].getStr()
     result.database.dbname = db["dbname"].getStr()
-    result.database.pool = db["pool_size"].getInt()
 
     var e = x["email"]
     result.email = EmailConf()
