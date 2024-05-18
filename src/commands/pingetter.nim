@@ -83,7 +83,7 @@ proc upload_catbox(zip_path, userhash: string): string =
   else:
     return ""
 
-proc zip_folder(folderPath: string, zipFilePath: string) =
+proc zip_folder(folderPath, zipFilePath: string) =
   var zipFile: ZipArchive
   var file_paths = toSeq(walkDirRec(folderPath))
   #echo file_paths
@@ -135,7 +135,7 @@ proc zip_up(guild_id, room_id: string, msgs: seq[Message], upconf: UploaderConf)
     error(e.msg)
   return url
 
-proc msgs_to_markdown(channel_name: string, channel_url: string, msgs: seq[Message]): string =
+proc msgs_to_markdown(channel_name, channel_url: string, msgs: seq[Message]): string =
   result &= "# [#" & channel_name & "](" & channel_url & ")\n\n"
 
   for (i, msg) in enumerate(0, msgs):

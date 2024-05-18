@@ -124,7 +124,7 @@ proc parse_sis_for_user(author_id: string): Future[bool] {.async} =
     return false
   return await parse_sis_for_user(dbuser.get())
 
-proc check_msg_for_verification_code*(msg: string, author_id: string): Future[bool] {.async} =
+proc check_msg_for_verification_code*(msg, author_id: string): Future[bool] {.async} =
   var conf = conf.email
   var str = msg.split(' ')
   if str[0] == "!overit":
