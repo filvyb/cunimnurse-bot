@@ -1036,6 +1036,22 @@ cmd.addChat("get-rooms-in-config") do ():
       error("get-rooms-in-config failed getting channel: " & e.msg)
       continue
   
+  final_str &= "Cultured channels\n"
+  await sleepAsync(100)
+
+  for i in conf.discord.cultured_channels:
+    if "id" in i:
+      continue
+    try:
+      var chan = (await discord.api.getChannel(i))[0].get()
+      var guild = await discord.api.getGuild(chan.guild_id)
+
+      final_str &= fmt"ID: {chan.id} Name: {chan.name} Server: {guild.name}"
+      final_str &= '\n'
+    except CatchableError as e:
+      error("get-rooms-in-config failed getting channel: " & e.msg)
+      continue
+  
   if final_str.len < 2000:
     discard await msg.reply(final_str)
   else:
@@ -1519,13 +1535,22 @@ proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
       discard await msg.reply("Vítej na našem serveru")
 
   if ch_type[0].isSome:
+    # Handle media in dedupe channels
     if room_id in conf.discord.dedupe_channels:
+      for em in msg.embeds:
+        var att = embed_to_attachment(em)
+        if att.isSome:
+          msg.attachments &= att.get()
       for a in msg.attachments:
         var dedupe_res = await dedupe_media(guild_id, room_id, msg_id, a)
         if dedupe_res[0] == true:
           var msg_med_ids = dedupe_res[2].split("|")
           var flagged_msg = await discord.api.getChannelMessage(room_id, msg_med_ids[0])
           var med_url = ""
+          for em in flagged_msg.embeds:
+            var att = embed_to_attachment(em)
+            if att.isSome:
+              flagged_msg.attachments &= att.get()
           for f in flagged_msg.attachments:
             if f.url.rfind(msg_med_ids[1]) >= 0:
               med_url = f.url
@@ -1535,6 +1560,8 @@ proc messageCreate(s: Shard, msg: Message) {.event(discord).} =
           var emb = Embed(title: some "Repost", description: some desc, image: some imgemb, footer: some EmbedFooter(text: msg_id))
           var sent_msg = await discord.api.sendMessage(room_id, content = msg_url, embeds = @[emb], message_reference = some MessageReference(channel_id: some room_id, message_id: some msg_id))
           await discord.api.addMessageReaction(room_id, sent_msg.id, "❎")
+    if room_id in conf.discord.cultured_channels:
+      echo "cultured"
 
 proc messageDelete(s: Shard, m: Message, exists: bool) {.event(discord).} =
   let room_id = m.channel_id

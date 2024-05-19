@@ -739,12 +739,78 @@ proc insert_pin_sum_msg*(guild_id, channel_id, message_id: string): bool =
     error(e.msg)
     return false
 
-proc get_pin_sum_time*(guild_id, channel_id, message_id: string): string =
+#[proc get_pin_sum_time*(guild_id, channel_id, message_id: string): string =
   try:
     var res = db.getValue(sql"SELECT last_summary FROM pin_summary WHERE guild_id = ? AND channel_id = ? AND message_id = ? LIMIT 1",
         guild_id, channel_id, message_id)
     
   except DbError as e:
     error(e.msg)
-    return ""
-  
+    return ""]#
+
+
+# Queries for sauces
+proc insert_sauce_image*(guild_id, channel_id, message_id, media_id, grays: seq[uint8]): bool = 
+  var invec = "[" & grays.join(",") & "]"
+  try:
+    db.exec(sql"INSERT INTO sauces (guild_id, channel_id, message_id, media_id, grays) VALUES (?, ?, ?, ?, ?)",
+        guild_id, channel_id, message_id, media_id, invec)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc insert_sauce_image_full*(guild_id, channel_id, message_id, media_id, grays: seq[uint8], sauce: string, tags: seq[string]): bool = 
+  var invec = "[" & grays.join(",") & "]"
+  var intags = "[" & tags.join(",") & "]"
+  try:
+    db.exec(sql"INSERT INTO sauces (guild_id, channel_id, message_id, media_id, grays, sauce, tags, scanned) VALUES (?, ?, ?, ?, ?, ?, ?, true)",
+        guild_id, channel_id, message_id, media_id, invec, sauce, intags)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc update_sauce_image*(guild_id, channel_id, message_id, sauce: string, tags: seq[string]): bool = 
+  var intags = "[" & tags.join(",") & "]"
+  try:
+    db.exec(sql"UPDATE sauces SET sauce = ?, tags = ?, scanned = true WHERE guild_id = ? AND channel_id = ? AND message_id = ?",
+        sauce, intags, guild_id, channel_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc update_sauce_image_allowed*(guild_id, channel_id, message_id: string, allowed: bool): bool = 
+  try:
+    db.exec(sql"UPDATE sauces SET allowed = ? WHERE guild_id = ? AND channel_id = ? AND message_id = ?",
+        allowed, guild_id, channel_id, message_id)
+    return true
+  except DbError as e:
+    error(e.msg)
+    return false
+
+proc get_sauce_image*(guild_id, channel_id, message_id: string): Option[array[3, string]] =
+  try:
+    var res = db.getRow(sql"SELECT media_id, sauce, tags FROM sauces WHERE guild_id = ? AND channel_id = ? AND message_id = ?",
+        guild_id, channel_id, message_id)
+    if res[0] == "":
+      return none(array[3, string])
+    var ret = [res[0], res[1], res[2]]
+    return some(ret)
+  except DbError as e:
+    error(e.msg)
+    return none(array[3, string])
+
+proc get_sauce_image_distance*(guild_id, channel_id: string, grays: seq[uint8]): Option[array[3, string]] =
+  var invec = "[" & grays.join(",") & "]"
+  try:
+    var res = db.getRow(sql"SELECT message_id, media_id, grays <-> ? AS distance FROM sauces WHERE guild_id = ? AND channel_id = ? ORDER BY distance LIMIT 1",
+        invec, guild_id, channel_id)
+    if res[0] == "":
+      return none(array[3, string])
+    var ret = [res[0], res[1], res[2]]
+    return some(ret)
+  except DbError as e:
+    error(e.msg)
+    return none(array[3, string])

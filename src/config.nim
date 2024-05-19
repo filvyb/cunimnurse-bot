@@ -17,6 +17,8 @@ type
     reaction_channels*: HashSet[string]
     thread_react_channels*: HashSet[string]
     dedupe_channels*: HashSet[string]
+    cultured_channels*: HashSet[string]
+    admin_channel*: string
     confession_channel*: string
     pin_sum_channel*: string
     pin_categories2sum*: HashSet[string]
@@ -103,6 +105,12 @@ proc initConfig(): Config =
     for t in tmp4:
       tmpseq4.add(t.getStr())
     result.discord.pin_categories2sum = toHashSet(tmpseq4)
+    var tmp5 = d["cultured_channels"].getElems()
+    var tmpseq5: seq[string]
+    for t in tmp5:
+      tmpseq5.add(t.getStr())
+    result.discord.cultured_channels = toHashSet(tmpseq5)
+    result.discord.admin_channel = d["admin_channel"].getStr()
     result.discord.pin_vote_count = d["pin_vote_count"].getInt()
 
     var db = x["database"]

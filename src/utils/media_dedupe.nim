@@ -1,4 +1,4 @@
-from dimscord import Attachment
+from dimscord import Attachment, Embed, EmbedImage, EmbedVideo
 import dhash
 import asynctools
 
@@ -12,6 +12,40 @@ import std/httpclient
 import ../db/queries
 import ../utils/logging as clogger
 
+# commiting crimes against humanity because I can't be bothered to rewrite dedupe_media to support embeds
+proc embed_to_attachment*(embed: Embed): Option[Attachment] =
+  if embed.type.get() == "image":
+    var url = embed.url.get()
+    var id = url.rsplit("/", 1)[1].split(".", 1)[0]
+    var file_ext = url.rsplit(".", 1)[1].split("?", 1)[0]
+    var content_type: string
+    if file_ext == "png":
+      content_type = "image/png"
+    elif file_ext == "jpg" or file_ext == "jpeg":
+      content_type = "image/jpeg"
+    elif file_ext == "gif":
+      content_type = "image/gif"
+    elif file_ext == "webp":
+      content_type = "image/webp"
+    else:
+      return none(Attachment)
+    return some(Attachment(id: id, url: url, content_type: some content_type))
+  elif embed.type.get() == "video" or embed.type.get() == "gifv":
+    var url = embed.url.get()
+    var id = url.rsplit("/", 1)[1].split(".", 1)[0]
+    var file_ext = url.rsplit(".", 1)[1].split("?", 1)[0]
+    var content_type: string
+    if file_ext == "mp4":
+      content_type = "video/mp4"
+    elif file_ext == "ogg":
+      content_type = "video/ogg"
+    elif file_ext == "webm":
+      content_type = "video/webm"
+    else:
+      return none(Attachment)
+    return some(Attachment(id: id, url: url, content_type: some content_type))
+  return none(Attachment)
+
 proc process_media_file(file_path: string, attach: Attachment): Future[string] {.async.} =
   var ffmpeg_out_tmp = await execProcess(fmt"ffmpeg -i {file_path} -vf 'blackdetect=d=0.05:pix_th=0.67' -an -f null - 2>&1 | grep blackdetect")
   var ffmpeg_out = (ffmpeg_out_tmp.output, ffmpeg_out_tmp.exitcode)
@@ -20,7 +54,7 @@ proc process_media_file(file_path: string, attach: Attachment): Future[string] {
 
   if ffmpeg_out[1] == 0:
     var ffmpeg_out_split = ffmpeg_out[0].split({'\n', '\r'})
-          
+
     if ffmpeg_out_split.len != 1:
       var start_time = ffmpeg_out_split[1].splitWhitespace()[3].split({':'})[1]
       if start_time == "0":

@@ -294,3 +294,29 @@ proc migrateDB*(scheme: int) =
     except DbError as e:
       echo e.msg
       quit(99)
+  if scheme < 7:
+    echo "Migrating DB from scheme version " & $scheme & " to version " & $(scheme + 1)
+    try:
+      db_conn.exec(sql("""CREATE TABLE sauces (
+                 guild_id TEXT,
+                 channel_id TEXT,
+                 message_id TEXT NOT NULL,
+                 media_id TEXT NOT NULL,
+                 grays vector(256),
+                 sauce TEXT,
+                 tags TEXT[],
+                 scanned BOOLEAN default FALSE,
+                 allowed BOOLEAN default TRUE,
+                 FOREIGN KEY(guild_id, channel_id) references channels(guild_id, id) ON DELETE CASCADE
+                 )"""))
+      db_conn.exec(sql"CREATE INDEX sau_id ON sauces (guild_id)")
+      db_conn.exec(sql"CREATE INDEX sau_id2 ON sauces (channel_id)")
+      db_conn.exec(sql"CREATE INDEX sau_id3 ON sauces (message_id)")
+      db_conn.exec(sql"CREATE INDEX sau_id2_id3 ON sauces (channel_id, message_id)")
+      db_conn.exec(sql"CREATE INDEX sau_id1_id2_id3_id4 ON sauces (guild_id, channel_id, message_id, media_id)")
+
+      db_conn.exec(sql"UPDATE scheme SET id = 7 WHERE id = ?", scheme)
+      scheme = scheme + 1
+    except DbError as e:
+      echo e.msg
+      quit(99)
