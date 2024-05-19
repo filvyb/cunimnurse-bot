@@ -31,7 +31,11 @@ proc embed_to_attachment*(embed: Embed): Option[Attachment] =
       return none(Attachment)
     return some(Attachment(id: id, url: url, content_type: some content_type))
   elif embed.type.get() == "video" or embed.type.get() == "gifv":
-    var url = embed.url.get()
+    var url: string
+    if embed.type.get() == "gifv":
+      url = embed.video.get().url.get()
+    else:
+      url = embed.url.get()
     var id = url.rsplit("/", 1)[1].split(".", 1)[0]
     var file_ext = url.rsplit(".", 1)[1].split("?", 1)[0]
     var content_type: string
