@@ -520,21 +520,19 @@ cmd.addSlash("search del") do (id: int):
   else:
     await i.reply("ID nenalezeno")
 
-cmd.addSlash("yomamma") do ():
-  ## Řekne vtip o tvojí mámě
-  var joke = "..."
-  await i.reply(joke)
-  joke = await get_mom_joke()
-  discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
-                                                    some joke)
+cmd.addSlash("ye") do ():
+  ## Cituje Kanye Westa
+  var quote = "..."
+  await i.reply(quote)
+  quote = await get_ye_quote()
+  discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original", some quote)
 
 cmd.addSlash("dadjoke") do ():
   ## Řekne dad joke
   var joke = "..."
   await i.reply(joke)
   joke = await get_dad_joke()
-  discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original",
-                                                    some joke)
+  discard await discord.api.editInteractionResponse(i.application_id, i.token, "@original", some joke)
 
 cmd.addSlash("zip-pins") do ():
   ## Pošle všechny piny do DM

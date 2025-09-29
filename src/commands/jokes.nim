@@ -7,7 +7,7 @@ import std/strutils
 
 import ../utils/logging as clogger
 
-proc get_mom_joke*(): Future[string] {.async.} =
+proc get_mom_joke*(): Future[string] {.async, deprecated.} =
   var client = newAsyncHttpClient()
   var resp: AsyncResponse
   try:
@@ -23,6 +23,23 @@ proc get_mom_joke*(): Future[string] {.async.} =
   else:
     error(fmt"Getting yo mama joke failed, error {resp.status}")
     return "Yo mama so fat, and old, that when God said “Let there be light,” he was just asking her to move out of the way."
+
+proc get_ye_quote*(): Future[string] {.async.} =
+  var client = newAsyncHttpClient()
+  var resp: AsyncResponse
+  try:
+    resp = await client.request("https://api.kanye.rest/")
+  except CatchableError as e:
+    error(fmt"Getting Kanye quote failed, error {e.msg}")
+    return "I feel like I'm too busy writing history to read it."
+  if resp.status == "200 OK":
+    let thequote = await resp.bodyStream.read()
+    if thequote[0] == true:
+      let quoteson = parseJson(thequote[1])
+      return quoteson["quote"].getStr()
+  else:
+    error(fmt"Getting Kanye quote failed, error {resp.status}")
+    return "I feel like I'm too busy writing history to read it."
 
 proc get_dad_joke*(): Future[string] {.async.} =
   var client = newAsyncHttpClient()
