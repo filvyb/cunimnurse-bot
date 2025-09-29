@@ -38,9 +38,9 @@ let discord* = newDiscordClient(conf.discord.token)
 var cmd* = discord.newHandler()
 
 proc create_room_role(guild_id: string, name: string, category_id: string): Future[(Role, GuildChannel)] {.async.} =
-  var myrole = await discord.api.createGuildRole(guild_id, name, permissions = PermObj(allowed: {}, denied: {}))
+  var myrole = await discord.api.createGuildRole(guild_id, name)
   discard await discord.api.editGuildRolePosition(guild_id, myrole.id, some 2)
-  let perm_over = @[Overwrite(id: myrole.id, kind: 0, allow: {permViewChannel}, deny: {})]
+  let perm_over = @[Overwrite(id: myrole.id, kind: otRole, allow: {permViewChannel}, deny: {})]
   let new_chan = await discord.api.createGuildChannel(guild_id, name, 0, some category_id, some name, permission_overwrites = some perm_over)
   return (myrole, new_chan)
 
@@ -60,9 +60,9 @@ proc figure_channel_users(c: GuildChannel): seq[string] =
   var over_perms = c.permission_overwrites
   var res: seq[string]
   for x, y in over_perms:
-    if y.kind == 1 and permViewChannel in y.allow:
+    if y.kind == otMember and permViewChannel in y.allow:
       res.add(y.id)
-    if y.kind == 0:
+    if y.kind == otRole:
       let rol_users = query.get_all_role_users(c.guild_id, y.id)
       if rol_users.isSome:
         for u in rol_users.get():
@@ -129,7 +129,7 @@ proc reply(m: Message, msg: string): Future[Message] {.async.} =
 proc reply(i: Interaction, msg: string) {.async.} =
   let response = InteractionResponse(
       kind: irtChannelMessageWithSource,
-      data: some InteractionApplicationCommandCallbackData(
+      data: some InteractionCallbackDataMessage(
           content: msg
       )
   )
@@ -496,7 +496,7 @@ cmd.addSlash("search list") do ():
 
   let response = InteractionResponse(
       kind: irtChannelMessageWithSource,
-      data: some InteractionApplicationCommandCallbackData(
+      data: some InteractionCallbackDataMessage(
           embeds: @[finemb]
       )
   )
@@ -591,7 +591,7 @@ cmd.addSlash("pocasi") do (place: Option[string]):
   if res[0] == 200:
     let response = InteractionResponse(
       kind: irtChannelMessageWithSource,
-      data: some InteractionApplicationCommandCallbackData(
+      data: some InteractionCallbackDataMessage(
           embeds: @[res[1]]
       )
     )
@@ -1094,7 +1094,7 @@ cmd.addChat("create-role-everywhere") do (role_name: string, role_position: int,
         var roles = query.get_all_roles(g).get()
         role_position = roles.len + role_position
 
-      var role = await discord.api.createGuildRole(g, role_name, permissions = PermObj(allowed: {}, denied: {}), color = parseHexInt(role_color))
+      var role = await discord.api.createGuildRole(g, role_name, color = parseHexInt(role_color))
       discard await discord.api.editGuildRolePosition(g, role.id, some role_position)
     except CatchableError as e:
       error("create-role-everywhere failed creating role: " & e.msg)
@@ -1238,11 +1238,11 @@ proc messageReactionAdd(s: Shard, m: Message, u: User, e: Emoji, exists: bool) {
         if not over_perms.hasKey(user_id):
           over_perms[user_id] = Overwrite()
           over_perms[user_id].id = user_id
-          over_perms[user_id].kind = 1
+          over_perms[user_id].kind = otMember
           over_perms[user_id].allow = {permViewChannel}
           over_perms[user_id].deny = {}
         else:
-          if over_perms[user_id].kind == 1:
+          if over_perms[user_id].kind == otMember:
             over_perms[user_id].allow = over_perms[user_id].allow + {permViewChannel}
         var new_over_perms: seq[Overwrite]
         for x, y in over_perms:
@@ -1361,7 +1361,7 @@ proc messageReactionRemove(s: Shard, m: Message, u: User, r: Reaction, exists: b
     if the_chan[0].isSome:
       var over_perms = the_chan[0].get().permission_overwrites
       if over_perms.hasKey(user_id):
-        if over_perms[user_id].kind == 1:
+        if over_perms[user_id].kind == otMember:
           over_perms[user_id].allow = over_perms[user_id].allow - {permViewChannel}
           if over_perms[user_id].allow.len == 0 and over_perms[user_id].deny.len == 0:
           #  over_perms.del(user_id)

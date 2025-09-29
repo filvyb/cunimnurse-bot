@@ -11,9 +11,9 @@ bin           = @["cunimnurse_bot"]
 # Dependencies
 
 requires "nim >= 2.0.0"
-requires "parsetoml >= 0.7.1"
-requires "dimscord#0ba8315"
-requires "dimscmd >= 1.4.1"
+requires "parsetoml >= 0.7.2"
+requires "dimscord >= 1.8.0"
+requires "dimscmd#head"
 requires "dhash >= 2.1.1"
 requires "stdx >= 0.2.3"
 requires "zip#06f5b0a"

@@ -6,3 +6,5 @@ config.toml
 cunimnurse_bot
 cunim.log
 emojis/
+nimble.develop
+nimble.paths
